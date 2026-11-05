@@ -1,5 +1,6 @@
 package br.com.chfb.ativo.assetmanagement.repository;
 
+import br.com.chfb.ativo.assetmanagement.entity.Asset;
 import br.com.chfb.ativo.assetmanagement.entity.WalletPosition;
 import java.util.List;
 import java.util.Optional;
@@ -19,4 +20,11 @@ public interface WalletPositionRepository extends JpaRepository<WalletPosition, 
             order by a.symbol
             """)
     List<WalletPosition> findActiveByWalletId(@Param("walletId") UUID walletId);
+
+    @Query("select p from WalletPosition p join fetch p.asset where p.quantity > 0")
+    List<WalletPosition> findAllActive();
+
+    /** Ativos com posição aberta em qualquer carteira. */
+    @Query("select distinct p.asset from WalletPosition p where p.quantity > 0")
+    List<Asset> findActiveAssets();
 }

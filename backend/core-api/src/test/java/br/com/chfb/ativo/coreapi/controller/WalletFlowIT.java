@@ -47,103 +47,85 @@ class WalletFlowIT {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void depositaCompraVendeEAtualizaSaldoEPosicao() throws Exception {
+    void compraEVendeAtualizandoPosicaoEHistorico() throws Exception {
         LoggedUser user = new LoggedUser();
         String symbol = uniqueSymbol();
 
-        assertThat(user.deposit("1000").getStatusCode()).isEqualTo(HttpStatus.CREATED);
-
-        // 1000 - (2 x 100 + 1,50) = 798,50
-        ResponseEntity<String> firstBuy = user.buy(symbol, "2", "100", "1.50", false);
+        ResponseEntity<String> firstBuy = user.buy(symbol, "2", "100", "1.50");
         assertThat(firstBuy.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(read(firstBuy).at("/transaction/totalAmount").decimalValue()).isEqualByComparingTo("201.50");
-        assertThat(read(firstBuy).at("/fiatBalance").decimalValue()).isEqualByComparingTo("798.50");
+        assertThat(read(firstBuy).at("/totalAmount").decimalValue()).isEqualByComparingTo("201.50");
 
-        // Preço médio: (2 x 100 + 2 x 200) / 4 = 150. Caixa: 798,50 - 400 = 398,50
-        user.buy(symbol, "2", "200", "0", false);
+        // Preço médio: (2 x 100 + 2 x 200) / 4 = 150
+        user.buy(symbol, "2", "200", "0");
 
-        // 398,50 + (1 x 300 - 0,50) = 698
+        // 1 x 300 - 0,50 = 299,50
         ResponseEntity<String> sale = user.sell(symbol, "1", "300", "0.50");
         assertThat(sale.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(read(sale).at("/transaction/totalAmount").decimalValue()).isEqualByComparingTo("299.50");
+        assertThat(read(sale).at("/totalAmount").decimalValue()).isEqualByComparingTo("299.50");
 
-        JsonNode summary = read(user.get("/api/wallets/summary"));
-        assertThat(summary.at("/fiatBalance").decimalValue()).isEqualByComparingTo("698");
-        assertThat(summary.at("/positions/0/symbol").asText()).isEqualTo(symbol);
-        assertThat(summary.at("/positions/0/quantity").decimalValue()).isEqualByComparingTo("3");
-        assertThat(summary.at("/positions/0/averagePrice").decimalValue()).isEqualByComparingTo("150");
+        JsonNode positions = read(user.get("/api/dashboard/positions"));
+        assertThat(positions.at("/0/symbol").asText()).isEqualTo(symbol);
+        assertThat(positions.at("/0/quantity").decimalValue()).isEqualByComparingTo("3");
+        assertThat(positions.at("/0/averagePrice").decimalValue()).isEqualByComparingTo("150");
 
         JsonNode statement = read(user.get("/api/transactions"));
-        assertThat(statement).hasSize(4);
+        assertThat(statement).hasSize(3);
         assertThat(statement.get(0).get("type").asText()).isEqualTo("SELL");
-        assertThat(statement.get(3).get("type").asText()).isEqualTo("DEPOSIT");
+        assertThat(statement.get(2).get("type").asText()).isEqualTo("BUY");
     }
 
     @Test
-    void contaSemMovimentacaoTemResumoEExtratoVaziosSemCriarCarteira() throws Exception {
-        LoggedUser user = new LoggedUser();
-
-        JsonNode summary = read(user.get("/api/wallets/summary"));
-
-        assertThat(summary.at("/fiatBalance").decimalValue()).isEqualByComparingTo("0");
-        assertThat(summary.at("/positions")).isEmpty();
-        assertThat(read(user.get("/api/transactions"))).isEmpty();
-        assertThat(walletsOf(user.email)).isZero();
-    }
-
-    @Test
-    void compraComSaldoInsuficienteERecusadaSemDeixarRastro() throws Exception {
+    void historicoFiltraPorTipo() throws Exception {
         LoggedUser user = new LoggedUser();
         String symbol = uniqueSymbol();
-        user.deposit("100");
+        user.buy(symbol, "2", "10", "0");
+        user.sell(symbol, "1", "10", "0");
 
-        ResponseEntity<String> buy = user.buy(symbol, "1", "100", "0.01", false);
+        JsonNode sales = read(user.get("/api/transactions?type=SELL"));
 
-        assertThat(buy.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        JsonNode summary = read(user.get("/api/wallets/summary"));
-        assertThat(summary.at("/fiatBalance").decimalValue()).isEqualByComparingTo("100");
-        assertThat(summary.at("/positions")).isEmpty();
-        assertThat(read(user.get("/api/transactions"))).hasSize(1);
-        assertThat(assetsWithSymbol(symbol)).isZero();
+        assertThat(sales).hasSize(1);
+        assertThat(sales.get(0).get("type").asText()).isEqualTo("SELL");
+        assertThat(user.get("/api/transactions?type=DEPOSIT").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
-    void compraComSaldoExatoZeraOCaixa() throws Exception {
+    void painelSemCotacaoAvaliaPeloPrecoMedioSemLucro() throws Exception {
         LoggedUser user = new LoggedUser();
-        user.deposit("100.01");
+        user.buy(uniqueSymbol(), "2", "100", "0");
 
-        ResponseEntity<String> buy = user.buy(uniqueSymbol(), "1", "100", "0.01", false);
+        JsonNode overview = read(user.get("/api/dashboard/overview"));
 
-        assertThat(buy.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(read(buy).at("/fiatBalance").decimalValue()).isEqualByComparingTo("0");
+        assertThat(overview.at("/investedValue").decimalValue()).isEqualByComparingTo("200");
+        assertThat(overview.at("/marketValue").decimalValue()).isEqualByComparingTo("200");
+        assertThat(overview.at("/profitLoss").decimalValue()).isEqualByComparingTo("0");
+        assertThat(overview.at("/positionsWithoutQuote").asInt()).isEqualTo(1);
     }
 
     @Test
-    void autoAporteDepositaSoADiferencaERegistraOsDoisLancamentos() throws Exception {
+    void painelUsaACotacaoParaCalcularLucroEPercentual() throws Exception {
         LoggedUser user = new LoggedUser();
-        user.deposit("30");
+        String symbol = uniqueSymbol();
+        user.buy(symbol, "2", "100", "0");
+        jdbcTemplate.update(
+                "INSERT INTO market_quotes (id, symbol, price, last_updated_at) VALUES (?, ?, 125, now())",
+                UUID.randomUUID(),
+                symbol);
 
-        ResponseEntity<String> buy = user.buy(uniqueSymbol(), "1", "100", "0", true);
+        JsonNode overview = read(user.get("/api/dashboard/overview"));
 
-        assertThat(buy.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        JsonNode body = read(buy);
-        assertThat(body.at("/autoDeposit/totalAmount").decimalValue()).isEqualByComparingTo("70");
-        assertThat(body.at("/fiatBalance").decimalValue()).isEqualByComparingTo("0");
-
-        List<String> types = new ArrayList<>();
-        read(user.get("/api/transactions")).forEach(entry -> types.add(entry.get("type").asText()));
-        assertThat(types).containsExactlyInAnyOrder("DEPOSIT", "DEPOSIT", "BUY");
+        assertThat(overview.at("/marketValue").decimalValue()).isEqualByComparingTo("250");
+        assertThat(overview.at("/profitLoss").decimalValue()).isEqualByComparingTo("50");
+        assertThat(overview.at("/profitLossPercent").decimalValue()).isEqualByComparingTo("25");
+        assertThat(overview.at("/positionsWithoutQuote").asInt()).isZero();
     }
 
     @Test
-    void autoAporteNaoDepositaQuandoOSaldoBasta() throws Exception {
+    void contaSemOperacoesTemPainelEHistoricoVaziosSemCriarCarteira() throws Exception {
         LoggedUser user = new LoggedUser();
-        user.deposit("100");
 
-        JsonNode body = read(user.buy(uniqueSymbol(), "1", "100", "0", true));
-
-        assertThat(body.at("/autoDeposit").isNull()).isTrue();
-        assertThat(read(user.get("/api/transactions"))).hasSize(2);
+        assertThat(read(user.get("/api/dashboard/positions"))).isEmpty();
+        assertThat(read(user.get("/api/transactions"))).isEmpty();
+        assertThat(walletsOf(user.email)).isZero();
     }
 
     @Test
@@ -155,92 +137,71 @@ class WalletFlowIT {
                 .as("ativo inexistente")
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
 
-        user.deposit("100");
-        user.buy(symbol, "1", "10", "0", false);
+        user.buy(symbol, "1", "10", "0");
 
         assertThat(user.sell(symbol, "1.00000001", "10", "0").getStatusCode())
                 .as("acima da custódia")
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-
-        JsonNode summary = read(user.get("/api/wallets/summary"));
-        assertThat(summary.at("/fiatBalance").decimalValue()).isEqualByComparingTo("90");
-        assertThat(summary.at("/positions/0/quantity").decimalValue()).isEqualByComparingTo("1");
+        assertThat(read(user.get("/api/dashboard/positions")).at("/0/quantity").decimalValue())
+                .isEqualByComparingTo("1");
     }
 
     @Test
-    void vendaTotalTiraOAtivoDoResumo() throws Exception {
+    void vendaTotalTiraOAtivoDasPosicoes() throws Exception {
         LoggedUser user = new LoggedUser();
         String symbol = uniqueSymbol();
-        user.deposit("100");
-        user.buy(symbol, "1", "10", "0", false);
+        user.buy(symbol, "1", "10", "0");
 
         assertThat(user.sell(symbol, "1", "10", "0").getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
-        assertThat(read(user.get("/api/wallets/summary")).at("/positions")).isEmpty();
+        assertThat(read(user.get("/api/dashboard/positions"))).isEmpty();
     }
 
     @Test
-    void taxaMaiorQueAVendaERecusada() throws Exception {
+    void taxaMaiorQueAVendaERecusada() {
         LoggedUser user = new LoggedUser();
         String symbol = uniqueSymbol();
-        user.deposit("100");
-        user.buy(symbol, "1", "10", "0", false);
+        user.buy(symbol, "1", "10", "0");
 
         assertThat(user.sell(symbol, "1", "10", "10.01").getStatusCode())
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     @Test
-    void resgateAcimaDoSaldoERecusado() throws Exception {
-        LoggedUser user = new LoggedUser();
-        user.deposit("100");
-
-        assertThat(user.fiat("WITHDRAW", "100.01").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(user.fiat("WITHDRAW", "100").getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(read(user.get("/api/wallets/summary")).at("/fiatBalance").decimalValue())
-                .isEqualByComparingTo("0");
-    }
-
-    @Test
     void valoresInvalidosRetornam400() {
         LoggedUser user = new LoggedUser();
+        String symbol = uniqueSymbol();
 
-        assertThat(user.fiat("DEPOSIT", "0").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(user.fiat("DEPOSIT", "-1").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(user.fiat("DEPOSIT", "1.00001").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(user.fiat("DEPOSIT", "1e1000000").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(user.fiat("BUY", "1").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(user.buy(symbol, "0", "10", "0").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(user.buy(symbol, "1", "-1", "0").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(user.buy(symbol, "1", "1.00001", "0").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(user.buy(symbol, "1", "1e1000000", "0").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(user.get("/api/transactions?size=201").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(user.get("/api/dashboard/history?days=366").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
     void valorAcimaDaColunaRetorna422ENao500() {
         LoggedUser user = new LoggedUser();
-        user.deposit("99999999999999");
 
-        assertThat(user.deposit("1").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(user.buy(uniqueSymbol(), "9999999999999999", "99999999999999", "0", true).getStatusCode())
+        assertThat(user.buy(uniqueSymbol(), "9999999999999999", "99999999999999", "0").getStatusCode())
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     @Test
-    void simboloEUnicoIgnorandoMaiusculasERecusaOutroTipo() throws Exception {
+    void simboloEUnicoIgnorandoMaiusculasERecusaOutroTipo() {
         LoggedUser first = new LoggedUser();
         LoggedUser second = new LoggedUser();
         String symbol = uniqueSymbol();
-        first.deposit("100");
-        second.deposit("100");
-        first.buy(symbol, "1", "10", "0", false);
+        first.buy(symbol, "1", "10", "0");
 
-        assertThat(second.buy(symbol.toLowerCase(), "1", "10", "0", false).getStatusCode())
+        assertThat(second.buy(symbol.toLowerCase(), "1", "10", "0").getStatusCode())
                 .isEqualTo(HttpStatus.CREATED);
         assertThat(assetsWithSymbol(symbol)).isEqualTo(1);
 
         ResponseEntity<String> otherType = second.post("/api/transactions/buy", """
                 {"symbol":"%s","assetType":"STOCK","quantity":1,"unitPrice":10}""".formatted(symbol));
         assertThat(otherType.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(read(second.get("/api/wallets/summary")).at("/fiatBalance").decimalValue())
-                .isEqualByComparingTo("90");
     }
 
     @Test
@@ -248,39 +209,40 @@ class WalletFlowIT {
         LoggedUser owner = new LoggedUser();
         LoggedUser other = new LoggedUser();
         String symbol = uniqueSymbol();
-        owner.deposit("100");
-        owner.buy(symbol, "1", "10", "0", false);
+        owner.buy(symbol, "1", "10", "0");
 
-        assertThat(read(other.get("/api/wallets/summary")).at("/positions")).isEmpty();
+        assertThat(read(other.get("/api/dashboard/positions"))).isEmpty();
         assertThat(read(other.get("/api/transactions"))).isEmpty();
         assertThat(other.sell(symbol, "1", "10", "0").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(read(owner.get("/api/wallets/summary")).at("/positions/0/quantity").decimalValue())
+        assertThat(read(owner.get("/api/dashboard/positions")).at("/0/quantity").decimalValue())
                 .isEqualByComparingTo("1");
     }
 
     @Test
-    void operacoesSimultaneasNaoGastamOMesmoSaldoDuasVezes() throws Exception {
+    void vendasSimultaneasNaoVendemAMesmaCustodiaDuasVezes() throws Exception {
         LoggedUser user = new LoggedUser();
-        user.deposit("100");
+        String symbol = uniqueSymbol();
+        user.buy(symbol, "1", "10", "0");
 
-        List<HttpStatus> statuses = runConcurrently(8, () -> user.fiat("WITHDRAW", "60"));
+        List<HttpStatus> statuses = runConcurrently(8, () -> user.sell(symbol, "0.6", "10", "0"));
 
         assertThat(statuses).containsOnlyOnce(HttpStatus.CREATED);
         assertThat(statuses).containsOnly(HttpStatus.CREATED, HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(read(user.get("/api/wallets/summary")).at("/fiatBalance").decimalValue())
-                .isEqualByComparingTo("40");
+        assertThat(read(user.get("/api/dashboard/positions")).at("/0/quantity").decimalValue())
+                .isEqualByComparingTo("0.4");
     }
 
     @Test
-    void primeiroDepositoSimultaneoCriaUmaUnicaCarteira() throws Exception {
+    void primeirasComprasSimultaneasCriamUmaUnicaCarteira() throws Exception {
         LoggedUser user = new LoggedUser();
+        String symbol = uniqueSymbol();
 
-        List<HttpStatus> statuses = runConcurrently(8, () -> user.deposit("10"));
+        List<HttpStatus> statuses = runConcurrently(8, () -> user.buy(symbol, "1", "10", "0"));
 
         assertThat(statuses).containsOnly(HttpStatus.CREATED);
         assertThat(walletsOf(user.email)).isEqualTo(1);
-        assertThat(read(user.get("/api/wallets/summary")).at("/fiatBalance").decimalValue())
-                .isEqualByComparingTo("80");
+        assertThat(read(user.get("/api/dashboard/positions")).at("/0/quantity").decimalValue())
+                .isEqualByComparingTo("8");
     }
 
     @Test
@@ -288,14 +250,12 @@ class WalletFlowIT {
         String symbol = uniqueSymbol();
         List<LoggedUser> users = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
-            LoggedUser user = new LoggedUser();
-            user.deposit("100");
-            users.add(user);
+            users.add(new LoggedUser());
         }
 
         try (AutoClosePool pool = new AutoClosePool(4)) {
             List<Future<ResponseEntity<String>>> futures = new ArrayList<>();
-            users.forEach(user -> futures.add(pool.executor.submit(() -> user.buy(symbol, "1", "10", "0", false))));
+            users.forEach(user -> futures.add(pool.executor.submit(() -> user.buy(symbol, "1", "10", "0"))));
             for (Future<ResponseEntity<String>> future : futures) {
                 assertThat(future.get().getStatusCode()).isEqualTo(HttpStatus.CREATED);
             }
@@ -306,7 +266,7 @@ class WalletFlowIT {
 
     @Test
     void semSessaoRetorna401() {
-        assertThat(restTemplate.getForEntity("/api/wallets/summary", String.class).getStatusCode())
+        assertThat(restTemplate.getForEntity("/api/dashboard/overview", String.class).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(restTemplate.getForEntity("/api/transactions", String.class).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -376,19 +336,10 @@ class WalletFlowIT {
                     .isEqualTo(HttpStatus.OK);
         }
 
-        ResponseEntity<String> deposit(String amount) {
-            return fiat("DEPOSIT", amount);
-        }
-
-        ResponseEntity<String> fiat(String type, String amount) {
-            return post("/api/wallets/fiat-movement", """
-                    {"type":"%s","amount":%s}""".formatted(type, amount));
-        }
-
-        ResponseEntity<String> buy(String symbol, String quantity, String price, String fee, boolean autoDeposit) {
+        ResponseEntity<String> buy(String symbol, String quantity, String price, String fee) {
             return post("/api/transactions/buy", """
                     {"symbol":"%s","name":"Ativo de teste","assetType":"CRYPTO","quantity":%s,"unitPrice":%s,\
-                    "fee":%s,"autoDeposit":%s}""".formatted(symbol, quantity, price, fee, autoDeposit));
+                    "fee":%s}""".formatted(symbol, quantity, price, fee));
         }
 
         ResponseEntity<String> sell(String symbol, String quantity, String price, String fee) {

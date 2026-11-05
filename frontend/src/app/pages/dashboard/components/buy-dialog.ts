@@ -3,23 +3,23 @@ import { Component, computed, effect, inject, input, model, output, signal, untr
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { SelectButtonModule } from 'primeng/selectbutton';
-import { AssetType, OperationResponse, Position } from '@/app/core/api.models';
+import { AssetType, Position, Transaction } from '@/app/core/api.models';
 import { errorMessage, fieldErrors } from '@/app/core/api-error';
 import { applyFieldErrors, controlError, positive } from '@/app/core/form-errors';
-import { buyTotal, roundMoney } from '@/app/core/portfolio';
+import { averageAfterBuy, buyTotal } from '@/app/core/portfolio';
+import { DecimalPaste } from '@/app/core/decimal-paste';
 import { WalletService } from '@/app/core/wallet.service';
 
 type ControlName = 'symbol' | 'name' | 'quantity' | 'unitPrice' | 'fee';
 
 @Component({
     selector: 'app-buy-dialog',
-    imports: [ButtonModule, CheckboxModule, CurrencyPipe, DialogModule, InputNumberModule, InputTextModule, MessageModule, ReactiveFormsModule, SelectButtonModule],
+    imports: [DecimalPaste, ButtonModule, CurrencyPipe, DialogModule, InputNumberModule, InputTextModule, MessageModule, ReactiveFormsModule, SelectButtonModule],
     template: `<p-dialog [header]="header()" [modal]="true" [draggable]="false" [resizable]="false" [style]="{ width: '32rem' }" [breakpoints]="{ '640px': '95vw' }" closeAriaLabel="Fechar" [(visible)]="visible" (onHide)="closed.emit()">
         <form id="buy-form" class="flex flex-col gap-4" novalidate [formGroup]="form" (ngSubmit)="submit()">
             @if (failure(); as message) {
@@ -61,7 +61,7 @@ type ControlName = 'symbol' | 'name' | 'quantity' | 'unitPrice' | 'fee';
 
             <div class="flex flex-col gap-2">
                 <label for="buy-quantity" class="font-medium">Quantidade</label>
-                <p-inputnumber inputId="buy-quantity" formControlName="quantity" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('quantity')" />
+                <p-inputnumber appDecimalPaste inputId="buy-quantity" formControlName="quantity" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('quantity')" />
                 @if (error('quantity'); as message) {
                     <p-message severity="error" size="small" variant="simple" [text]="message" />
                 }
@@ -69,14 +69,14 @@ type ControlName = 'symbol' | 'name' | 'quantity' | 'unitPrice' | 'fee';
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="flex flex-col gap-2">
                     <label for="buy-price" class="font-medium">Preço unitário</label>
-                    <p-inputnumber inputId="buy-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('unitPrice')" />
+                    <p-inputnumber appDecimalPaste inputId="buy-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('unitPrice')" />
                     @if (error('unitPrice'); as message) {
                         <p-message severity="error" size="small" variant="simple" [text]="message" />
                     }
                 </div>
                 <div class="flex flex-col gap-2">
                     <label for="buy-fee" class="font-medium">Taxa <span class="text-muted-color font-normal">(opcional)</span></label>
-                    <p-inputnumber inputId="buy-fee" formControlName="fee" mode="currency" currency="BRL" locale="pt-BR" [min]="0" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('fee')" />
+                    <p-inputnumber appDecimalPaste inputId="buy-fee" formControlName="fee" mode="currency" currency="BRL" locale="pt-BR" [min]="0" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('fee')" />
                     @if (error('fee'); as message) {
                         <p-message severity="error" size="small" variant="simple" [text]="message" />
                     }
@@ -86,24 +86,15 @@ type ControlName = 'symbol' | 'name' | 'quantity' | 'unitPrice' | 'fee';
             <dl class="grid grid-cols-2 gap-y-1 m-0 p-4 rounded-border bg-surface-100 dark:bg-surface-800">
                 <dt>Total da compra</dt>
                 <dd class="m-0 text-right font-semibold">{{ total() | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
-                <dt>Saldo em caixa</dt>
-                <dd class="m-0 text-right">{{ balance() | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
-            </dl>
-
-            <div class="flex items-center gap-2">
-                <p-checkbox inputId="buy-auto-deposit" formControlName="autoDeposit" [binary]="true" />
-                <label for="buy-auto-deposit">Completar o saldo com um aporte automático</label>
-            </div>
-
-            @if (shortage() > 0) {
-                @if (autoDeposit()) {
-                    <p-message severity="info" size="small">Será registrado um aporte de {{ shortage() | currency: 'BRL' : 'symbol' : '1.2-4' }} antes da compra.</p-message>
-                } @else if (attempted()) {
-                    <p-message severity="error" size="small">Saldo insuficiente: faltam {{ shortage() | currency: 'BRL' : 'symbol' : '1.2-4' }}. Faça um aporte ou marque a opção acima.</p-message>
-                } @else {
-                    <p-message severity="warn" size="small">Faltam {{ shortage() | currency: 'BRL' : 'symbol' : '1.2-4' }} no caixa para esta compra.</p-message>
+                @if (position(); as held) {
+                    <dt>Preço médio atual</dt>
+                    <dd class="m-0 text-right">{{ held.averagePrice | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
+                    @if (newAverage(); as average) {
+                        <dt>Novo preço médio</dt>
+                        <dd class="m-0 text-right font-semibold">{{ average | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
+                    }
                 }
-            }
+            </dl>
         </form>
         <ng-template #footer>
             <p-button label="Cancelar" severity="secondary" [text]="true" (onClick)="visible.set(false)" />
@@ -115,10 +106,9 @@ export class BuyDialog {
     private readonly wallet = inject(WalletService);
 
     readonly visible = model(false);
-    readonly balance = input.required<number>();
     /** Com uma posição, o ativo já está definido e só faltam os dados da compra. */
     readonly position = input<Position | null>(null);
-    readonly completed = output<OperationResponse>();
+    readonly completed = output<Transaction>();
     readonly closed = output<void>();
 
     protected readonly assetTypes: { label: string; value: AssetType }[] = [
@@ -132,13 +122,11 @@ export class BuyDialog {
         assetType: ['STOCK' as AssetType, [Validators.required]],
         quantity: [null as number | null, [Validators.required, positive]],
         unitPrice: [null as number | null, [Validators.required, positive]],
-        fee: [null as number | null],
-        autoDeposit: [false]
+        fee: [null as number | null]
     });
     private readonly formEvents = toSignal(this.form.events);
 
     protected readonly submitting = signal(false);
-    protected readonly attempted = signal(false);
     protected readonly failure = signal<string | null>(null);
 
     protected readonly header = computed(() => {
@@ -151,10 +139,12 @@ export class BuyDialog {
         const { quantity, unitPrice, fee } = this.form.getRawValue();
         return buyTotal(quantity ?? 0, unitPrice ?? 0, fee ?? 0);
     });
-    protected readonly shortage = computed(() => Math.max(roundMoney(this.total() - this.balance()), 0));
-    protected readonly autoDeposit = computed(() => {
+
+    protected readonly newAverage = computed(() => {
         this.formEvents();
-        return !!this.form.controls.autoDeposit.value;
+        const position = this.position();
+        const { quantity, unitPrice } = this.form.getRawValue();
+        return position && quantity && unitPrice ? averageAfterBuy(position, quantity, unitPrice) : null;
     });
 
     constructor() {
@@ -172,18 +162,14 @@ export class BuyDialog {
     }
 
     protected submit(): void {
-        this.attempted.set(true);
         this.form.markAllAsTouched();
-        const { symbol, name, assetType, quantity, unitPrice, fee, autoDeposit } = this.form.getRawValue();
+        const { symbol, name, assetType, quantity, unitPrice, fee } = this.form.getRawValue();
         if (this.form.invalid || !symbol || !assetType || quantity === null || unitPrice === null || this.submitting()) {
-            return;
-        }
-        if (this.shortage() > 0 && !autoDeposit) {
             return;
         }
         this.submitting.set(true);
         this.failure.set(null);
-        this.wallet.buy({ symbol: symbol.trim(), name: name?.trim() || undefined, assetType, quantity, unitPrice, fee: fee ?? 0, autoDeposit: !!autoDeposit }).subscribe({
+        this.wallet.buy({ symbol: symbol.trim(), name: name?.trim() || undefined, assetType, quantity, unitPrice, fee: fee ?? 0 }).subscribe({
             next: (response) => {
                 this.submitting.set(false);
                 this.visible.set(false);
@@ -199,8 +185,7 @@ export class BuyDialog {
     }
 
     private reset(position: Position | null): void {
-        this.form.reset({ symbol: position?.symbol ?? '', name: '', assetType: position?.assetType ?? 'STOCK', quantity: null, unitPrice: null, fee: null, autoDeposit: false });
-        this.attempted.set(false);
+        this.form.reset({ symbol: position?.symbol ?? '', name: '', assetType: position?.assetType ?? 'STOCK', quantity: null, unitPrice: null, fee: null });
         this.failure.set(null);
         this.submitting.set(false);
     }

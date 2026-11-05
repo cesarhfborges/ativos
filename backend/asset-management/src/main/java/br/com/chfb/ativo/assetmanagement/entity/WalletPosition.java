@@ -64,6 +64,10 @@ public class WalletPosition {
         return quantity.compareTo(requestedQuantity) >= 0;
     }
 
+    public UUID getWalletId() {
+        return walletId;
+    }
+
     public Asset getAsset() {
         return asset;
     }

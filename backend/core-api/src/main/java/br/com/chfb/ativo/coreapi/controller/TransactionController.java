@@ -1,7 +1,7 @@
 package br.com.chfb.ativo.coreapi.controller;
 
-import br.com.chfb.ativo.assetmanagement.dto.OperationResponse;
 import br.com.chfb.ativo.assetmanagement.dto.TransactionResponse;
+import br.com.chfb.ativo.assetmanagement.entity.TransactionType;
 import br.com.chfb.ativo.assetmanagement.service.WalletService;
 import br.com.chfb.ativo.coreapi.config.OpenApiConfig;
 import br.com.chfb.ativo.coreapi.dto.BuyRequest;
@@ -41,7 +41,7 @@ public class TransactionController {
         this.walletService = walletService;
     }
 
-    @Operation(summary = "Retorna o extrato do usuário logado, do lançamento mais recente ao mais antigo")
+    @Operation(summary = "Retorna o histórico de compras e vendas do usuário logado, do mais recente ao mais antigo")
     @ApiResponse(responseCode = "200", description = "Página do extrato")
     @ApiResponse(
             responseCode = "400",
@@ -53,9 +53,10 @@ public class TransactionController {
     @GetMapping
     public List<TransactionResponse> statement(
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) TransactionType type,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size) {
-        return walletService.statement(user.getId(), page, size);
+        return walletService.statement(user.getId(), type, page, size);
     }
 
     @Operation(
@@ -77,19 +78,19 @@ public class TransactionController {
                     schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
             responseCode = "422",
-            description = "Saldo em caixa insuficiente ou valor acima do limite",
+            description = "Valor acima do limite",
             content = @Content(
                     mediaType = "application/problem+json",
                     schema = @Schema(implementation = ProblemDetail.class)))
     @PostMapping("/buy")
     @ResponseStatus(HttpStatus.CREATED)
-    public OperationResponse buy(
+    public TransactionResponse buy(
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @Valid @RequestBody BuyRequest body) {
         return walletService.buy(user.getId(), body.toOrder());
     }
 
-    @Operation(summary = "Registra uma venda", description = "Reduz a custódia e credita o valor líquido no caixa.")
+    @Operation(summary = "Registra uma venda", description = "Reduz a custódia e registra o valor líquido.")
     @ApiResponse(responseCode = "201", description = "Venda registrada")
     @ApiResponse(
             responseCode = "400",
@@ -106,7 +107,7 @@ public class TransactionController {
                     schema = @Schema(implementation = ProblemDetail.class)))
     @PostMapping("/sell")
     @ResponseStatus(HttpStatus.CREATED)
-    public OperationResponse sell(
+    public TransactionResponse sell(
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @Valid @RequestBody SellRequest body) {
         return walletService.sell(user.getId(), body.toOrder());

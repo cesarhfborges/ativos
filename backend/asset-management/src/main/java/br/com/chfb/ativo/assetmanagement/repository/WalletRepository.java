@@ -14,7 +14,7 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
 
     Optional<Wallet> findByUserId(UUID userId);
 
-    /** Toda movimentação começa aqui: operações simultâneas da carteira esperam umas pelas outras. */
+    /** Toda operação começa aqui: operações simultâneas da carteira esperam umas pelas outras. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select w from Wallet w where w.userId = :userId")
     Optional<Wallet> findByUserIdForUpdate(@Param("userId") UUID userId);
@@ -22,8 +22,8 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
     @Modifying
     @Query(
             value = """
-                    INSERT INTO wallets (id, user_id, name, fiat_balance)
-                    VALUES (:id, :userId, :name, 0)
+                    INSERT INTO wallets (id, user_id, name)
+                    VALUES (:id, :userId, :name)
                     ON CONFLICT (user_id) DO NOTHING
                     """,
             nativeQuery = true)

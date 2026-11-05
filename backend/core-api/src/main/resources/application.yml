@@ -37,6 +37,22 @@ app:
     # Lista separada por vírgulas. O padrão é o ng serve do Angular.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
+market:
+  # Para trocar de provedor, basta alterar estas propriedades. Vazio desliga a coleta do grupo.
+  provider:
+    crypto: ${MARKET_PROVIDER_CRYPTO:binance}
+    stock: ${MARKET_PROVIDER_STOCK:brapi}
+  # Hora cheia. Só esta coleta gera snapshots patrimoniais.
+  collection-cron: ${MARKET_COLLECTION_CRON:0 0 * * * *}
+  collect-on-startup: ${MARKET_COLLECT_ON_STARTUP:true}
+  binance:
+    base-url: https://api.binance.com
+    quote-asset: BRL
+  brapi:
+    base-url: https://brapi.dev
+    # Sem token, a Brapi só responde para alguns ativos de teste (PETR4, VALE3, ITUB4 e MGLU3).
+    token: ${BRAPI_TOKEN:}
+
 springdoc:
   api-docs:
     enabled: ${SWAGGER_ENABLED:true}

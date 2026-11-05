@@ -2,7 +2,7 @@
 
 Sistema multiusuário para acompanhar carteiras de ações e criptomoedas: patrimônio, rentabilidade, histórico e projeções. O escopo completo está em [`docs/`](docs/).
 
-Por enquanto, o repositório contém a fundação do backend e a autenticação. Ainda não há endpoints de negócio.
+O repositório contém autenticação, registro de compras e vendas, coleta de cotações, dashboard e o frontend que usa esses recursos. Projeções (Etapa 5) ainda não existem.
 
 ## Stack
 
@@ -10,13 +10,14 @@ Por enquanto, o repositório contém a fundação do backend e a autenticação.
 - PostgreSQL 16, Flyway e Spring Session JDBC
 - springdoc-openapi (Swagger UI)
 - Maven (multi-módulo), Docker e Docker Compose
+- Angular 21 e PrimeNG 21 (layout Sakai), com Node 22, em pt-BR
 
 ## Módulos
 
 | Módulo | Responsabilidade |
 | --- | --- |
 | `shared-kernel` | Contratos, identificadores e enums compartilhados |
-| `asset-management` | Carteiras, caixa, compras, vendas, posições e preço médio |
+| `asset-management` | Carteiras, compras, vendas, posições e preço médio |
 | `market-tracker` | Provedores de mercado, coleta agendada e cotações |
 | `predictive-engine` | Simulações, tendências e projeções |
 | `core-api` | Aplicação executável, sessão, segurança e migrações |
@@ -67,6 +68,11 @@ Variáveis do `application.yml`:
 | `SESSION_COOKIE_SECURE` | `false` | Envia o cookie só por HTTPS; use `true` em produção |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:4200` | Origens autorizadas a chamar a API com credenciais, separadas por vírgula |
 | `SWAGGER_ENABLED` | `true` | Publica o Swagger UI e o OpenAPI sem exigir login; use `false` em produção |
+| `MARKET_PROVIDER_CRYPTO` | `binance` | Provedor de cotações de cripto; vazio desliga a coleta do grupo |
+| `MARKET_PROVIDER_STOCK` | `brapi` | Provedor de cotações de ações; vazio desliga a coleta do grupo |
+| `BRAPI_TOKEN` | Vazio | Token da Brapi; sem ele, só alguns ativos de teste têm cotação (PETR4, VALE3, ITUB4 e MGLU3) |
+| `MARKET_COLLECTION_CRON` | `0 0 * * * *` | Agenda da coleta que gera os snapshots patrimoniais |
+| `MARKET_COLLECT_ON_STARTUP` | `true` | Atualiza as cotações ao iniciar, sem gerar snapshot |
 
 Os padrões são apenas de desenvolvimento: em produção, defina todas elas. O que estiver no `application-local.yml` tem prioridade sobre `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` quando o perfil `local` está ativo.
 
@@ -93,8 +99,21 @@ Sobe só o banco no Docker e roda a aplicação pelo Maven, que ativa o perfil `
 docker compose up -d db
 cd backend
 mvn spring-boot:run
+```
 or
+```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+outras formas
+```bash
+mvn test
+```
+```bash
+mvn compile spring-boot:run
+```
+```bash
+mvn -pl core-api -am test
 ```
 
 Os comandos Maven rodam dentro de `backend/`, onde está o `pom.xml`. Para rodar pela IDE, execute `AtivosApplication` com o perfil `local` ativo.
@@ -107,6 +126,22 @@ O Spring Boot DevTools reinicia a aplicação quando uma classe compilada muda e
 - **IntelliJ:** use `Ctrl+F9`. Para compilar ao salvar, ative `Build project automatically` em `Settings > Build, Execution, Deployment > Compiler` e `Allow auto-make to start even if developed application is currently running` em `Settings > Advanced Settings`.
 
 As sessões ficam no banco, então o login continua válido depois do reinício. O DevTools só funciona em execução local: ele não entra no WAR nem na imagem Docker.
+
+## Frontend
+
+Com o backend em `localhost:8080`:
+
+```bash
+cd frontend
+nvm use          # Node 22
+npm ci
+npm start        # http://localhost:4200, com /api encaminhado ao backend
+npm test -- --watch=false --browsers=ChromeHeadless
+```
+
+No `docker compose up --build`, o frontend sobe em <http://localhost:4200>, servido pelo Nginx, que encaminha `/api/` ao backend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
+
+Telas: login, registro, painel (patrimônio, desempenho, posições a mercado, evolução patrimonial, alocação e últimas operações, com registro de compra e venda) e extrato com filtro por tipo. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
 
 ## Documentação da API
 
@@ -146,6 +181,19 @@ curl -b cookies.txt -c cookies.txt "${HEADERS[@]}" $API/login \
 curl -b cookies.txt $API/me
 ```
 
+## Cotações e dashboard
+
+A coleta de hora cheia consulta só os símbolos com posição aberta, grava a última cotação em `market_quotes` e gera um ponto em `portfolio_snapshots` para cada carteira. Se um provedor falhar, o símbolo mantém a última cotação conhecida e o log registra um aviso. Cripto é cotada em BRL pelo par da Binance, como `BTCBRL`.
+
+| Endpoint | Descrição |
+| --- | --- |
+| `GET /api/dashboard/overview` | Valor investido, valor a mercado e retorno |
+| `GET /api/dashboard/positions` | Posições com preço médio, cotação e lucro ou prejuízo; sem cotação, valem pelo preço médio |
+| `GET /api/dashboard/history?days=30` | Pontos do histórico patrimonial, de 1 a 365 dias |
+| `POST /api/dashboard/refresh-quotes` | Atualiza as cotações agora, uma vez por minuto no máximo, sem gerar snapshot |
+
+Para adicionar um provedor, implemente `CryptoMarketProvider` ou `StockMarketProvider` com `@ConditionalOnProperty` e aponte `market.provider.*` para ele.
+
 ## Deploy em Tomcat
 
 O build gera `backend/core-api/target/ativos-backend.war`. Use o Tomcat 10.1: versões anteriores à 10 não são compatíveis com Jakarta EE.
@@ -175,10 +223,10 @@ O Flyway não gerencia as tabelas `spring_session*`: o próprio Spring Session a
 
 | Etapa | Situação |
 | --- | --- |
-| 1. Arquitetura base e autenticação | Em andamento: backend concluído; falta o frontend |
-| 2. Gestão de ativos | Não iniciada |
-| 3. Cotações e provedores | Não iniciada |
-| 4. Dashboard | Não iniciada |
+| 1. Arquitetura base e autenticação | Concluída |
+| 2. Gestão de ativos | Concluída |
+| 3. Cotações e provedores | Concluída |
+| 4. Dashboard | Concluída |
 | 5. Predição e análise | Não iniciada |
 
 ## Comandos úteis

@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
-/** Registro imutável do extrato. */
+/** Registro imutável do histórico de compras e vendas. */
 @Entity
 @Table(name = "transactions")
 public class WalletTransaction {
@@ -29,17 +29,17 @@ public class WalletTransaction {
     private UUID walletId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "asset_id", updatable = false)
+    @JoinColumn(name = "asset_id", nullable = false, updatable = false)
     private Asset asset;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false)
     private TransactionType type;
 
-    @Column(precision = 24, scale = 8, updatable = false)
+    @Column(nullable = false, precision = 24, scale = 8, updatable = false)
     private BigDecimal quantity;
 
-    @Column(name = "unit_price", precision = 18, scale = 4, updatable = false)
+    @Column(name = "unit_price", nullable = false, precision = 18, scale = 4, updatable = false)
     private BigDecimal unitPrice;
 
     @Column(nullable = false, precision = 18, scale = 4, updatable = false)
@@ -73,14 +73,6 @@ public class WalletTransaction {
         this.timestamp = Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
-    public static WalletTransaction deposit(UUID walletId, BigDecimal amount) {
-        return cashMovement(walletId, TransactionType.DEPOSIT, amount);
-    }
-
-    public static WalletTransaction withdraw(UUID walletId, BigDecimal amount) {
-        return cashMovement(walletId, TransactionType.WITHDRAW, amount);
-    }
-
     public static WalletTransaction buy(
             UUID walletId, Asset asset, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fee, BigDecimal total) {
         return new WalletTransaction(walletId, asset, TransactionType.BUY, quantity, unitPrice, fee, total);
@@ -89,10 +81,6 @@ public class WalletTransaction {
     public static WalletTransaction sell(
             UUID walletId, Asset asset, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fee, BigDecimal total) {
         return new WalletTransaction(walletId, asset, TransactionType.SELL, quantity, unitPrice, fee, total);
-    }
-
-    private static WalletTransaction cashMovement(UUID walletId, TransactionType type, BigDecimal amount) {
-        return new WalletTransaction(walletId, null, type, null, null, Amounts.money(BigDecimal.ZERO), amount);
     }
 
     public UUID getId() {

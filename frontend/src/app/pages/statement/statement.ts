@@ -1,26 +1,28 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { MessageModule } from 'primeng/message';
+import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { Transaction, TransactionType } from '@/app/core/api.models';
 import { errorMessage } from '@/app/core/api-error';
+import { TRANSACTION_DISPLAY } from '@/app/core/transaction-display';
 import { WalletService } from '@/app/core/wallet.service';
 
 const PAGE_SIZE = 20;
 
-const TYPE_DISPLAY: Record<TransactionType, { label: string; icon: string; credit: boolean }> = {
-    BUY: { label: 'Compra', icon: 'pi pi-shopping-cart', credit: false },
-    SELL: { label: 'Venda', icon: 'pi pi-dollar', credit: true },
-    DEPOSIT: { label: 'Aporte', icon: 'pi pi-arrow-down', credit: true },
-    WITHDRAW: { label: 'Resgate', icon: 'pi pi-arrow-up', credit: false }
-};
-
 @Component({
     selector: 'app-statement',
-    imports: [ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, MessageModule, TableModule],
+    imports: [FormsModule, ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, MessageModule, SelectModule, TableModule],
     template: `
-        <h1 class="text-3xl! font-semibold mt-0! mb-6!">Extrato</h1>
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-3xl! font-semibold m-0!">Extrato</h1>
+            <div class="flex items-center gap-2">
+                <span id="statement-filter-label" class="font-medium">Tipo</span>
+                <p-select ariaLabelledBy="statement-filter-label" optionLabel="label" optionValue="value" class="w-44" [options]="filterOptions" [ngModel]="filter()" (ngModelChange)="applyFilter($event)" />
+            </div>
+        </div>
 
         <div class="card">
             @if (failure(); as message) {
@@ -32,35 +34,27 @@ const TYPE_DISPLAY: Record<TransactionType, { label: string; icon: string; credi
                         <ng-template #header>
                             <tr>
                                 <th scope="col">Data</th>
-                                <th scope="col">Lançamento</th>
+                                <th scope="col">Operação</th>
                                 <th scope="col">Ativo</th>
                                 <th scope="col" class="text-right!">Quantidade</th>
                                 <th scope="col" class="text-right!">Preço unitário</th>
                                 <th scope="col" class="text-right!">Taxa</th>
-                                <th scope="col" class="text-right!">Total no caixa</th>
+                                <th scope="col" class="text-right!">Total</th>
                             </tr>
                         </ng-template>
                         <ng-template #body let-transaction>
                             <tr>
                                 <td class="whitespace-nowrap">{{ transaction.timestamp | date: 'short' }}</td>
                                 <td class="whitespace-nowrap"><i class="mr-2 {{ display(transaction.type).icon }}" aria-hidden="true"></i>{{ display(transaction.type).label }}</td>
-                                <td>{{ transaction.symbol ?? '—' }}</td>
+                                <td>{{ transaction.symbol }}</td>
                                 <td class="text-right">
-                                    @if (transaction.quantity !== null) {
-                                        {{ transaction.quantity | number: '1.0-8' }}
-                                    } @else {
-                                        —
-                                    }
+                                    {{ transaction.quantity | number: '1.0-8' }}
                                 </td>
                                 <td class="text-right">
-                                    @if (transaction.unitPrice !== null) {
-                                        {{ transaction.unitPrice | currency: 'BRL' : 'symbol' : '1.2-4' }}
-                                    } @else {
-                                        —
-                                    }
+                                    {{ transaction.unitPrice | currency: 'BRL' : 'symbol' : '1.2-4' }}
                                 </td>
                                 <td class="text-right">{{ transaction.fee | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
-                                <td class="text-right font-medium whitespace-nowrap">{{ display(transaction.type).credit ? '+' : '−' }} {{ transaction.totalAmount | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
+                                <td class="text-right font-medium whitespace-nowrap">{{ transaction.totalAmount | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
                             </tr>
                         </ng-template>
                         <ng-template #emptymessage>
@@ -83,6 +77,11 @@ const TYPE_DISPLAY: Record<TransactionType, { label: string; icon: string; credi
 export class Statement implements OnInit {
     private readonly wallet = inject(WalletService);
 
+    protected readonly filterOptions: { label: string; value: TransactionType | null }[] = [
+        { label: 'Todos', value: null },
+        ...(Object.keys(TRANSACTION_DISPLAY) as TransactionType[]).map((value) => ({ label: TRANSACTION_DISPLAY[value].label, value }))
+    ];
+    protected readonly filter = signal<TransactionType | null>(null);
     protected readonly transactions = signal<Transaction[]>([]);
     protected readonly page = signal(0);
     protected readonly loading = signal(true);
@@ -97,7 +96,7 @@ export class Statement implements OnInit {
 
     protected load(page: number): void {
         this.loading.set(true);
-        this.wallet.statement(page, PAGE_SIZE).subscribe({
+        this.wallet.statement(page, PAGE_SIZE, this.filter()).subscribe({
             next: (transactions) => {
                 this.transactions.set(transactions);
                 this.page.set(page);
@@ -111,7 +110,12 @@ export class Statement implements OnInit {
         });
     }
 
+    protected applyFilter(type: TransactionType | null): void {
+        this.filter.set(type);
+        this.load(0);
+    }
+
     protected display(type: TransactionType) {
-        return TYPE_DISPLAY[type];
+        return TRANSACTION_DISPLAY[type];
     }
 }

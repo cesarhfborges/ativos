@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Em DEPOSIT e WITHDRAW, {@code symbol}, {@code quantity} e {@code unitPrice} vêm nulos. */
 public record TransactionResponse(
         UUID id,
         TransactionType type,
@@ -21,7 +20,7 @@ public record TransactionResponse(
         return new TransactionResponse(
                 transaction.getId(),
                 transaction.getType(),
-                transaction.getAsset() == null ? null : transaction.getAsset().getSymbol(),
+                transaction.getAsset().getSymbol(),
                 transaction.getQuantity(),
                 transaction.getUnitPrice(),
                 transaction.getFee(),

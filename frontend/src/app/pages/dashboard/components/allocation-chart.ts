@@ -6,16 +6,16 @@ import { LayoutService } from '@/app/layout/service/layout.service';
 
 /** Cor fixa por categoria, escolhida por tema e validada contra daltonismo e contraste com a superfície. */
 const COLORS: Record<'light' | 'dark', Record<AllocationKey, string>> = {
-    light: { CRYPTO: '#2a78d6', STOCK: '#eb6834', CASH: '#1baf7a' },
-    dark: { CRYPTO: '#3987e5', STOCK: '#d95926', CASH: '#199e70' }
+    light: { CRYPTO: '#2a78d6', STOCK: '#eb6834' },
+    dark: { CRYPTO: '#3987e5', STOCK: '#d95926' }
 };
 
 @Component({
     selector: 'app-allocation-chart',
     imports: [ChartModule, CurrencyPipe, DecimalPipe],
-    template: `<div class="card mb-0">
+    template: `<div class="card mb-0 h-full">
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Alocação da carteira</h2>
-        <p class="text-muted-color mt-0! mb-6!">Criptomoedas, ações e caixa, com posições a preço médio.</p>
+        <p class="text-muted-color mt-0! mb-6!">Criptomoedas e ações, a valor de mercado.</p>
 
         <div class="flex flex-col md:flex-row md:items-center gap-8">
             @if (hasData()) {
@@ -23,7 +23,7 @@ const COLORS: Record<'light' | 'dark', Record<AllocationKey, string>> = {
                     <p-chart type="doughnut" [data]="chartData()" [options]="chartOptions" [ariaLabel]="description()" />
                 </div>
             } @else {
-                <p class="text-muted-color m-0! md:w-56 shrink-0">Sua carteira ainda está vazia. Faça um aporte ou registre uma compra para ver a distribuição.</p>
+                <p class="text-muted-color m-0! md:w-56 shrink-0">Sua carteira ainda está vazia. Registre uma compra para ver a distribuição.</p>
             }
 
             <table class="w-full max-w-lg">

@@ -6,17 +6,18 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { MessageModule } from 'primeng/message';
-import { OperationResponse, Position } from '@/app/core/api.models';
+import { Position, Transaction } from '@/app/core/api.models';
 import { errorMessage, fieldErrors } from '@/app/core/api-error';
 import { applyFieldErrors, controlError, positive } from '@/app/core/form-errors';
-import { sellNet } from '@/app/core/portfolio';
+import { saleResult, sellNet } from '@/app/core/portfolio';
+import { DecimalPaste } from '@/app/core/decimal-paste';
 import { WalletService } from '@/app/core/wallet.service';
 
 type ControlName = 'quantity' | 'unitPrice' | 'fee';
 
 @Component({
     selector: 'app-sell-dialog',
-    imports: [ButtonModule, CurrencyPipe, DecimalPipe, DialogModule, InputNumberModule, MessageModule, ReactiveFormsModule],
+    imports: [DecimalPaste, ButtonModule, CurrencyPipe, DecimalPipe, DialogModule, InputNumberModule, MessageModule, ReactiveFormsModule],
     template: `<p-dialog
         [header]="'Vender ' + (position()?.symbol ?? '')"
         [modal]="true"
@@ -38,7 +39,7 @@ type ControlName = 'quantity' | 'unitPrice' | 'fee';
                     <label for="sell-quantity" class="font-medium">Quantidade</label>
                     <p-button label="Vender tudo" size="small" [text]="true" (onClick)="sellAll()" />
                 </div>
-                <p-inputnumber inputId="sell-quantity" formControlName="quantity" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('quantity')" />
+                <p-inputnumber appDecimalPaste inputId="sell-quantity" formControlName="quantity" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('quantity')" />
                 <small class="text-muted-color">Disponível: {{ position()?.quantity | number: '1.0-8' }}</small>
                 @if (error('quantity'); as message) {
                     <p-message severity="error" size="small" variant="simple" [text]="message" />
@@ -47,14 +48,14 @@ type ControlName = 'quantity' | 'unitPrice' | 'fee';
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="flex flex-col gap-2">
                     <label for="sell-price" class="font-medium">Preço unitário</label>
-                    <p-inputnumber inputId="sell-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('unitPrice')" />
+                    <p-inputnumber appDecimalPaste inputId="sell-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('unitPrice')" />
                     @if (error('unitPrice'); as message) {
                         <p-message severity="error" size="small" variant="simple" [text]="message" />
                     }
                 </div>
                 <div class="flex flex-col gap-2">
                     <label for="sell-fee" class="font-medium">Taxa <span class="text-muted-color font-normal">(opcional)</span></label>
-                    <p-inputnumber inputId="sell-fee" formControlName="fee" mode="currency" currency="BRL" locale="pt-BR" [min]="0" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('fee')" />
+                    <p-inputnumber appDecimalPaste inputId="sell-fee" formControlName="fee" mode="currency" currency="BRL" locale="pt-BR" [min]="0" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('fee')" />
                     @if (error('fee'); as message) {
                         <p-message severity="error" size="small" variant="simple" [text]="message" />
                     }
@@ -64,6 +65,12 @@ type ControlName = 'quantity' | 'unitPrice' | 'fee';
             <dl class="grid grid-cols-2 gap-y-1 m-0 p-4 rounded-border bg-surface-100 dark:bg-surface-800">
                 <dt>Valor líquido a receber</dt>
                 <dd class="m-0 text-right font-semibold">{{ net() | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
+                <dt>Preço médio da posição</dt>
+                <dd class="m-0 text-right">{{ position()?.averagePrice | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
+                @if (result(); as value) {
+                    <dt>{{ value > 0 ? 'Lucro na venda' : 'Prejuízo na venda' }}</dt>
+                    <dd class="m-0 text-right font-semibold" [class]="value > 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ value > 0 ? '+' : '−' }} {{ absolute(value) | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
+                }
             </dl>
 
             @if (net() < 0) {
@@ -81,7 +88,7 @@ export class SellDialog {
 
     readonly visible = model(false);
     readonly position = input<Position | null>(null);
-    readonly completed = output<OperationResponse>();
+    readonly completed = output<Transaction>();
     readonly closed = output<void>();
 
     protected readonly form = inject(FormBuilder).group({
@@ -99,6 +106,16 @@ export class SellDialog {
         const { quantity, unitPrice, fee } = this.form.getRawValue();
         return sellNet(quantity ?? 0, unitPrice ?? 0, fee ?? 0);
     });
+
+    /** Só aparece com quantidade e preço preenchidos; zero (sem resultado) também não é mostrado. */
+    protected readonly result = computed(() => {
+        this.formEvents();
+        const position = this.position();
+        const { quantity, unitPrice, fee } = this.form.getRawValue();
+        return position && quantity && unitPrice ? saleResult(position, quantity, unitPrice, fee ?? 0) : null;
+    });
+
+    protected readonly absolute = Math.abs;
 
     constructor() {
         effect(() => {

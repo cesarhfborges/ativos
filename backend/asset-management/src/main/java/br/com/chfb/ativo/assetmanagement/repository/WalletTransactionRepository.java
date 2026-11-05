@@ -1,5 +1,6 @@
 package br.com.chfb.ativo.assetmanagement.repository;
 
+import br.com.chfb.ativo.assetmanagement.entity.TransactionType;
 import br.com.chfb.ativo.assetmanagement.entity.WalletTransaction;
 import java.util.List;
 import java.util.UUID;
@@ -13,8 +14,9 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
     @Query("""
             select t from WalletTransaction t
             left join fetch t.asset
-            where t.walletId = :walletId
+            where t.walletId = :walletId and (:type is null or t.type = :type)
             order by t.timestamp desc, t.id desc
             """)
-    List<WalletTransaction> findStatement(@Param("walletId") UUID walletId, Pageable pageable);
+    List<WalletTransaction> findStatement(
+            @Param("walletId") UUID walletId, @Param("type") TransactionType type, Pageable pageable);
 }

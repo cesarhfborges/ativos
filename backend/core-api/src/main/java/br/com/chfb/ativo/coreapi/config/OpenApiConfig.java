@@ -19,8 +19,8 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     public static final String AUTH_TAG = "Autenticação";
-    public static final String WALLET_TAG = "Carteira";
     public static final String TRANSACTION_TAG = "Transações";
+    public static final String DASHBOARD_TAG = "Dashboard";
     public static final String SESSION_SCHEME = "session";
 
     private static final String DESCRIPTION = """

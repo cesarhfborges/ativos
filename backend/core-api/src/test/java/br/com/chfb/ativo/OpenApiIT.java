@@ -43,8 +43,9 @@ class OpenApiIT {
         String body = restTemplate.getForObject("/v3/api-docs", String.class);
 
         assertThat(body).contains(
-                "\"/api/wallets/summary\"",
-                "\"/api/wallets/fiat-movement\"",
+                "\"/api/dashboard/overview\"",
+                "\"/api/dashboard/positions\"",
+                "\"/api/dashboard/history\"",
                 "\"/api/transactions\"",
                 "\"/api/transactions/buy\"",
                 "\"/api/transactions/sell\"");

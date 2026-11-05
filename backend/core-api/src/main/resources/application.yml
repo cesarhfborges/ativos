@@ -1,0 +1,56 @@
+# Configuração completa, usada no Docker Compose (sem perfil).
+# Para rodar na máquina, application-local.yml sobrescreve o que for diferente.
+spring:
+  application:
+    name: ativos-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ativos}
+    username: ${DB_USERNAME:ativos}
+    password: ${DB_PASSWORD:ativos}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+  session:
+    jdbc:
+      initialize-schema: always
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      cookie:
+        # O padrão do Spring Session é SESSION; a documentação define JSESSIONID.
+        name: JSESSIONID
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+
+app:
+  cors:
+    # Lista separada por vírgulas. O padrão é o ng serve do Angular.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+    # A página lê o cookie XSRF-TOKEN e envia o header X-XSRF-TOKEN em cada chamada.
+    csrf:
+      enabled: true
+  paths-to-match: /api/**
+  default-produces-media-type: application/json
+  # Sem isso, as respostas do @RestControllerAdvice entram em todos os endpoints da documentação.
+  override-with-generic-response: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

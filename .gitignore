@@ -1,0 +1,14 @@
+# Segredos locais
+.env
+
+# Maven
+target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Sistema operacional
+.DS_Store
+/backend/core-api/src/main/resources/application-local.yml

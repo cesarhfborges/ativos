@@ -1,29 +1,38 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { BuyRequest, FiatMovementRequest, OperationResponse, SellRequest, Transaction, WalletSummary } from './api.models';
+import { BuyRequest, DashboardOverview, DashboardPosition, PortfolioHistoryPoint, SellRequest, Transaction, TransactionType } from './api.models';
 
 @Injectable({ providedIn: 'root' })
 export class WalletService {
     private readonly http = inject(HttpClient);
 
-    summary(): Observable<WalletSummary> {
-        return this.http.get<WalletSummary>('/api/wallets/summary');
+    overview(): Observable<DashboardOverview> {
+        return this.http.get<DashboardOverview>('/api/dashboard/overview');
     }
 
-    fiatMovement(body: FiatMovementRequest): Observable<OperationResponse> {
-        return this.http.post<OperationResponse>('/api/wallets/fiat-movement', body);
+    positions(): Observable<DashboardPosition[]> {
+        return this.http.get<DashboardPosition[]>('/api/dashboard/positions');
     }
 
-    buy(body: BuyRequest): Observable<OperationResponse> {
-        return this.http.post<OperationResponse>('/api/transactions/buy', body);
+    history(days: number): Observable<PortfolioHistoryPoint[]> {
+        return this.http.get<PortfolioHistoryPoint[]>('/api/dashboard/history', { params: { days } });
     }
 
-    sell(body: SellRequest): Observable<OperationResponse> {
-        return this.http.post<OperationResponse>('/api/transactions/sell', body);
+    /** `refreshed` é falso quando já houve uma coleta no último minuto. */
+    refreshQuotes(): Observable<{ refreshed: boolean }> {
+        return this.http.post<{ refreshed: boolean }>('/api/dashboard/refresh-quotes', null);
     }
 
-    statement(page: number, size: number): Observable<Transaction[]> {
-        return this.http.get<Transaction[]>('/api/transactions', { params: { page, size } });
+    buy(body: BuyRequest): Observable<Transaction> {
+        return this.http.post<Transaction>('/api/transactions/buy', body);
+    }
+
+    sell(body: SellRequest): Observable<Transaction> {
+        return this.http.post<Transaction>('/api/transactions/sell', body);
+    }
+
+    statement(page: number, size: number, type?: TransactionType | null): Observable<Transaction[]> {
+        return this.http.get<Transaction[]>('/api/transactions', { params: { page, size, ...(type ? { type } : {}) } });
     }
 }

@@ -5,14 +5,13 @@ O objetivo deste sistema é permitir que múltiplos usuários acompanhem e faça
 
 ## 2. Metas de Negócio e Funcionais
 * **Isolamento de Carteiras:** Cada usuário autenticado acessa exclusivamente seu próprio painel (dashboard), visualizando:
-  * Saldo em caixa disponível (moeda fiat).
   * Posições abertas em ativos (Ações e Criptos).
-  * Patrimônio consolidado (Caixa + Soma de `Quantidade * Cotação Atual`).
+  * Patrimônio consolidado (Soma de `Quantidade * Cotação Atual`).
   * Rentabilidade absoluta e percentual com base no Preço Médio ponderado de compra.
 * **Operações Transacionais:**
-  * Compra de ativos: liquida do saldo em caixa e cria/incrementa a posição de custódia com recálculo de preço médio.
-  * Venda de ativos: reduz/encerra a posição de custódia e injeta o montante liquidado de volta ao caixa.
-  * Aportes e retiradas diretas de caixa.
+  * Compra de ativos: registra a entrada e cria/incrementa a posição de custódia com recálculo de preço médio.
+  * Venda de ativos: registra a saída e reduz/encerra a posição de custódia.
+  * Histórico de todas as entradas (compras) e saídas (vendas).
 * **Coleta Inteligente de Cotações:**
   * Coleta periódica horária automática.
   * Consulta apenas os ativos que os usuários possuem em custódia ativa (evitando requisições desnecessárias para ativos não utilizados).
@@ -27,7 +26,7 @@ O objetivo deste sistema é permitir que múltiplos usuários acompanhem e faça
   * Toda a solução roda no mesmo projeto Spring Boot, mas separada em pacotes/submódulos independentes com interfaces de contrato bem definidas.
   * Módulos previstos:
     1. `core-api`: Autenticação por sessão, segurança e orquestração base.
-    2. `asset-management`: Regras de negócio de carteira, saldo em caixa, compra, venda e preço médio.
+    2. `asset-management`: Regras de negócio de carteira, compra, venda e preço médio.
     3. `market-tracker`: Mecanismo dinâmico de coleta de cotações com suporte a troca simples de provedores (Binance, Brapi, CoinGecko, etc.).
     4. `predictive-engine`: Motor preditivo de simulações e cálculos de tendências.
     5. `shared-kernel`: Contratos, identificadores comuns e enums compartilhados.

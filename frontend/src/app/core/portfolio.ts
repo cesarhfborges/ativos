@@ -1,6 +1,6 @@
-import { Position, WalletSummary } from './api.models';
+import { DashboardPosition, Position } from './api.models';
 
-export type AllocationKey = 'CRYPTO' | 'STOCK' | 'CASH';
+export type AllocationKey = Position['assetType'];
 
 export interface AllocationSlice {
     key: AllocationKey;
@@ -12,8 +12,7 @@ export interface AllocationSlice {
 
 const ALLOCATION_LABELS: Record<AllocationKey, string> = {
     CRYPTO: 'Criptomoedas',
-    STOCK: 'Ações',
-    CASH: 'Caixa'
+    STOCK: 'Ações'
 };
 
 /** Mesma escala e arredondamento (HALF_UP) dos valores monetários no backend. */
@@ -22,33 +21,31 @@ export function roundMoney(value: number): number {
     return (sign * Math.round((Math.abs(value) + Number.EPSILON) * 1e4)) / 1e4;
 }
 
-export function positionCost(position: Position): number {
-    return roundMoney(position.quantity * position.averagePrice);
-}
-
-export function investedTotal(positions: Position[]): number {
-    return roundMoney(positions.reduce((total, position) => total + position.quantity * position.averagePrice, 0));
-}
-
-/** Quanto sai do caixa em uma compra. */
+/** Valor total de uma compra, com a taxa. */
 export function buyTotal(quantity: number, unitPrice: number, fee: number): number {
     return roundMoney(quantity * unitPrice + fee);
 }
 
-/** Quanto entra no caixa em uma venda; negativo quando a taxa supera o valor vendido. */
+/** Valor líquido de uma venda; negativo quando a taxa supera o valor vendido. */
 export function sellNet(quantity: number, unitPrice: number, fee: number): number {
     return roundMoney(quantity * unitPrice - fee);
 }
 
-/** Distribuição do patrimônio a preço médio, com as três categorias sempre presentes e na mesma ordem. */
-export function allocation(summary: WalletSummary): AllocationSlice[] {
-    const investedIn = (type: Position['assetType']) => investedTotal(summary.positions.filter((position) => position.assetType === type));
-    const values: Record<AllocationKey, number> = {
-        CRYPTO: investedIn('CRYPTO'),
-        STOCK: investedIn('STOCK'),
-        CASH: summary.fiatBalance
-    };
-    const total = values.CRYPTO + values.STOCK + values.CASH;
+/** Preço médio ponderado depois da compra; a taxa não entra no cálculo, como no backend. */
+export function averageAfterBuy(position: Position, quantity: number, unitPrice: number): number {
+    return roundMoney((position.quantity * position.averagePrice + quantity * unitPrice) / (position.quantity + quantity));
+}
+
+/** Resultado da venda sobre o preço médio, já descontada a taxa. */
+export function saleResult(position: Position, quantity: number, unitPrice: number, fee: number): number {
+    return roundMoney(sellNet(quantity, unitPrice, fee) - quantity * position.averagePrice);
+}
+
+/** Distribuição do patrimônio a mercado, com as duas categorias sempre presentes e na mesma ordem. */
+export function allocation(positions: DashboardPosition[]): AllocationSlice[] {
+    const marketValueOf = (type: AllocationKey) => roundMoney(positions.filter((position) => position.assetType === type).reduce((total, position) => total + position.marketValue, 0));
+    const values: Record<AllocationKey, number> = { CRYPTO: marketValueOf('CRYPTO'), STOCK: marketValueOf('STOCK') };
+    const total = values.CRYPTO + values.STOCK;
 
     return (Object.keys(values) as AllocationKey[]).map((key) => ({
         key,

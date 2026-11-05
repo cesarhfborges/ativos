@@ -36,7 +36,7 @@ const AtivosPreset = definePreset(Aura, {
         }
     },
     components: {
-        button: { colorScheme: { light: { outlined: { secondary: { color: '{surface.700}' } } } } },
+        button: { colorScheme: { light: { outlined: { secondary: { color: '{surface.700}' } }, text: { secondary: { color: '{surface.700}' } } } } },
         toast: { colorScheme: { light: SEVERITY_COLORS } },
         message: {
             colorScheme: {

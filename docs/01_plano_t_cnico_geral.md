@@ -45,23 +45,21 @@ O banco armazena as tabelas de sessão, segurança, operações financeiras e co
 
 * `users`: `id (UUID)`, `name`, `email`, `password_hash`, `created_at`
 * `spring_session` & `spring_session_attributes`: Tabelas nativas do Spring Session JDBC.
-* `wallets`: `id (UUID)`, `user_id (FK)`, `name`, `fiat_balance (NUMERIC 18, 4)`
+* `wallets`: `id (UUID)`, `user_id (FK)`, `name`
 * `assets`: `id (UUID)`, `symbol (VARCHAR)`, `name`, `asset_type (STOCK | CRYPTO)`
 * `wallet_positions`: `id (UUID)`, `wallet_id (FK)`, `asset_id (FK)`, `quantity (NUMERIC 24, 8)`, `average_price (NUMERIC 18, 4)`
-* `transactions`: `id (UUID)`, `wallet_id (FK)`, `asset_id (FK nullable)`, `type (BUY | SELL | DEPOSIT | WITHDRAW)`, `quantity (NUMERIC 24, 8 nullable)`, `unit_price (NUMERIC 18, 4 nullable)`, `fee (NUMERIC 18, 4)`, `total_amount (NUMERIC 18, 4)`, `timestamp`
-* `market_quotes`: `id (UUID)`, `symbol`, `price (NUMERIC 18, 4)`, `last_updated_at`
-* `portfolio_snapshots`: `id (UUID)`, `wallet_id (FK)`, `fiat_balance`, `invested_balance`, `total_balance`, `snapshot_time`
+* `transactions`: `id (UUID)`, `wallet_id (FK)`, `asset_id (FK)`, `type (BUY | SELL)`, `quantity (NUMERIC 24, 8)`, `unit_price (NUMERIC 18, 4)`, `fee (NUMERIC 18, 4)`, `total_amount (NUMERIC 18, 4)`, `timestamp`
+* `market_quotes`: `id (UUID)`, `symbol`, `price (NUMERIC 24, 8)`, `last_updated_at`
+* `portfolio_snapshots`: `id (UUID)`, `wallet_id (FK)`, `invested_balance`, `total_balance`, `snapshot_time`
 
 ---
 
-## 4. Regra Transacional: Auto-Aporte Embutido (Opção B)
+## 4. Regra Transacional: Registro de Compras e Vendas
 
-Para garantir integridade contábil e flexibilidade para o usuário:
-1. **Compra via Saldo Disponível:** Se `fiat_balance >= total_necessario`, debita diretamente do caixa existente.
-2. **Compra com Auto-Aporte Externo:** Caso o usuário opte por comprar com recurso externo (ou se o caixa for insuficiente e a flag `autoDeposit = true` for fornecida):
-   * O sistema gera automaticamente um registro de transação `DEPOSIT` com o montante deficitário necessário.
-   * Credita o valor na carteira e, na mesma transação atômica (`@Transactional`), debita o valor pela transação `BUY`.
-   * A custódia do ativo é criada/atualizada em `wallet_positions`, o histórico fica 100% auditável e o saldo fiat não fica inconsistente.
+O sistema não controla saldo em caixa: registra as operações que o usuário fez fora dele.
+1. **Compra:** registra a transação `BUY` e cria/atualiza a posição em `wallet_positions`, recalculando o preço médio.
+2. **Venda:** exige custódia suficiente, registra a transação `SELL` e reduz a posição.
+3. Ambas rodam em uma única transação atômica (`@Transactional`), e o histórico fica 100% auditável.
 
 ---
 

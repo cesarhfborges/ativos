@@ -16,8 +16,7 @@ export interface RegisterRequest extends LoginRequest {
 }
 
 export type AssetType = 'STOCK' | 'CRYPTO';
-export type TransactionType = 'BUY' | 'SELL' | 'DEPOSIT' | 'WITHDRAW';
-export type FiatMovementType = Extract<TransactionType, 'DEPOSIT' | 'WITHDRAW'>;
+export type TransactionType = 'BUY' | 'SELL';
 
 export interface Position {
     symbol: string;
@@ -27,28 +26,40 @@ export interface Position {
     averagePrice: number;
 }
 
-export interface WalletSummary {
-    fiatBalance: number;
-    positions: Position[];
+/** Sem cotação, `currentPrice` é nulo e o valor de mercado usa o preço médio, com lucro zero. */
+export interface DashboardPosition extends Position {
+    currentPrice: number | null;
+    investedValue: number;
+    marketValue: number;
+    profitLoss: number;
+    profitLossPercent: number;
+    quoteUpdatedAt: string | null;
 }
 
-/** Em DEPOSIT e WITHDRAW, `symbol`, `quantity` e `unitPrice` vêm nulos. */
+export interface DashboardOverview {
+    investedValue: number;
+    marketValue: number;
+    profitLoss: number;
+    profitLossPercent: number;
+    positionsWithoutQuote: number;
+    quotesUpdatedAt: string | null;
+}
+
+export interface PortfolioHistoryPoint {
+    time: string;
+    investedBalance: number;
+    totalBalance: number;
+}
+
 export interface Transaction {
     id: string;
     type: TransactionType;
-    symbol: string | null;
-    quantity: number | null;
-    unitPrice: number | null;
+    symbol: string;
+    quantity: number;
+    unitPrice: number;
     fee: number;
     totalAmount: number;
     timestamp: string;
-}
-
-/** `autoDeposit` só vem preenchido quando a compra precisou gerar um depósito automático. */
-export interface OperationResponse {
-    transaction: Transaction;
-    autoDeposit: Transaction | null;
-    fiatBalance: number;
 }
 
 export interface BuyRequest {
@@ -58,7 +69,6 @@ export interface BuyRequest {
     quantity: number;
     unitPrice: number;
     fee: number;
-    autoDeposit: boolean;
 }
 
 export interface SellRequest {
@@ -66,9 +76,4 @@ export interface SellRequest {
     quantity: number;
     unitPrice: number;
     fee: number;
-}
-
-export interface FiatMovementRequest {
-    type: FiatMovementType;
-    amount: number;
 }

@@ -8,9 +8,20 @@ import jakarta.validation.constraints.Size;
 import java.nio.charset.StandardCharsets;
 
 public record RegisterRequest(
-        @Schema(example = "Ana") @NotBlank @Size(max = 120) String name,
-        @Schema(example = "ana@example.com") @NotBlank @Email @Size(max = 254) String email,
-        @Schema(example = "senha-forte-123") @NotBlank @Size(min = 8, max = 72) String password) {
+        @Schema(example = "Ana")
+        @NotBlank @Size(max = 120)
+        String name,
+
+        @Schema(example = "ana@example.com")
+        @NotBlank
+        @Email
+        @Size(max = 254)
+        String email,
+
+        @Schema(example = "senha-forte-123")
+        @NotBlank
+        @Size(min = 8, max = 72)
+        String password) {
 
     /** O BCrypt só considera 72 bytes; um caractere acentuado ocupa mais de um. */
     @Schema(hidden = true)

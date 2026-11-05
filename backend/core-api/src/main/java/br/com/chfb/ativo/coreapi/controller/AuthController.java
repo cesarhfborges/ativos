@@ -20,14 +20,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-/** O logout ({@code POST /api/auth/logout}) é tratado pelo filtro definido em {@code SecurityConfig}. */
+/**
+ * O logout ({@code POST /api/auth/logout}) é tratado pelo filtro definido em {@code SecurityConfig}.
+ */
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = OpenApiConfig.AUTH_TAG)
@@ -57,13 +54,15 @@ public class AuthController {
             description = "Dados inválidos",
             content = @Content(
                     mediaType = "application/problem+json",
-                    schema = @Schema(implementation = ProblemDetail.class)))
+                    schema = @Schema(implementation = ProblemDetail.class))
+    )
     @ApiResponse(
             responseCode = "409",
             description = "E-mail já cadastrado",
             content = @Content(
                     mediaType = "application/problem+json",
-                    schema = @Schema(implementation = ProblemDetail.class)))
+                    schema = @Schema(implementation = ProblemDetail.class))
+    )
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse register(@Valid @RequestBody RegisterRequest body) {
@@ -77,7 +76,8 @@ public class AuthController {
             description = "Dados inválidos",
             content = @Content(
                     mediaType = "application/problem+json",
-                    schema = @Schema(implementation = ProblemDetail.class)))
+                    schema = @Schema(implementation = ProblemDetail.class))
+    )
     @ApiResponse(
             responseCode = "401",
             description = "E-mail ou senha inválidos",

@@ -39,6 +39,18 @@ class OpenApiIT {
     }
 
     @Test
+    void documentacaoListaOsEndpointsDeCarteiraETransacoes() {
+        String body = restTemplate.getForObject("/v3/api-docs", String.class);
+
+        assertThat(body).contains(
+                "\"/api/wallets/summary\"",
+                "\"/api/wallets/fiat-movement\"",
+                "\"/api/transactions\"",
+                "\"/api/transactions/buy\"",
+                "\"/api/transactions/sell\"");
+    }
+
+    @Test
     void documentacaoNaoExpoeDetalhesInternos() {
         String body = restTemplate.getForObject("/v3/api-docs", String.class);
 

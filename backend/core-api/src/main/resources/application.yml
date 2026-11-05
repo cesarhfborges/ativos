@@ -16,6 +16,10 @@ spring:
   session:
     jdbc:
       initialize-schema: always
+  jackson:
+    generator:
+      # Sem isso, uma quantidade como 0.00000001 sai no JSON como 1E-8.
+      write-bigdecimal-as-plain: true
 
 server:
   port: ${SERVER_PORT:8080}

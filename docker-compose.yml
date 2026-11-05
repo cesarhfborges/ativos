@@ -41,6 +41,18 @@ services:
     networks:
       - ativos
 
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ativos
+
 networks:
   ativos:
     driver: bridge

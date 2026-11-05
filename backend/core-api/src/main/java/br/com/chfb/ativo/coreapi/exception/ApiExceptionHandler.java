@@ -1,5 +1,7 @@
 package br.com.chfb.ativo.coreapi.exception;
 
+import br.com.chfb.ativo.assetmanagement.exception.AssetTypeConflictException;
+import br.com.chfb.ativo.assetmanagement.exception.BusinessRuleException;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
@@ -21,6 +23,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(EmailAlreadyInUseException.class)
     public ProblemDetail handleEmailAlreadyInUse(EmailAlreadyInUseException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(AssetTypeConflictException.class)
+    public ProblemDetail handleAssetTypeConflict(AssetTypeConflictException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(BusinessRuleException.class)
+    public ProblemDetail handleBusinessRule(BusinessRuleException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
     }
 
     /** Mesma mensagem para e-mail inexistente e senha errada, para não revelar quem tem conta. */

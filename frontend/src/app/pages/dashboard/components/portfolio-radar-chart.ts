@@ -3,14 +3,34 @@ import { Component, computed, inject, input } from '@angular/core';
 import { ChartModule } from 'primeng/chart';
 import { ChartResize } from '@/app/shared/chart-resize';
 import { chartTheme } from '@/app/core/chart-theme';
-import { RadarAxis } from '@/app/core/portfolio-radar';
+import { RADAR_BANDS, RadarAxis, radarBand } from '@/app/core/portfolio-radar';
 import { LayoutService } from '@/app/layout/service/layout.service';
 
 /** Um polígono precisa de pelo menos três pontos. */
 const MIN_AXES = 3;
 const FILL_ALPHA = '33';
 
-/** O formato da carteira em seis notas. A tabela traz o valor real por trás de cada uma e explica como é medida. */
+/** O que o Chart.js entrega às cores calculadas. */
+interface RadarContext {
+    chart: { ctx: CanvasRenderingContext2D; chartArea?: unknown; scales: { r?: { xCenter: number; yCenter: number } } };
+}
+
+/**
+ * Cada vértice fica exatamente na cor da própria nota, e as arestas passam de uma cor à outra. O radar começa no topo e
+ * segue em sentido horário, com os eixos em ângulos iguais, como o gradiente cônico a partir de -90°.
+ */
+function vertexGradient({ chart: { ctx, chartArea, scales } }: RadarContext, colors: string[]): CanvasGradient | string {
+    // Na primeira passada o Chart.js ainda não mediu a área do gráfico: a escala existe, mas sem centro.
+    if (!chartArea || !scales.r) {
+        return colors[0];
+    }
+    const gradient = ctx.createConicGradient(-Math.PI / 2, scales.r.xCenter, scales.r.yCenter);
+    colors.forEach((color, index) => gradient.addColorStop(index / colors.length, color));
+    gradient.addColorStop(1, colors[0]);
+    return gradient;
+}
+
+/** O formato da carteira em seis notas. A cor de cada vértice mostra a faixa da nota; a tabela traz o valor real por trás de cada uma e explica como é medida. */
 @Component({
     selector: 'app-portfolio-radar-chart',
     imports: [ChartModule, ChartResize, DecimalPipe],
@@ -20,8 +40,18 @@ const FILL_ALPHA = '33';
 
         <div class="flex flex-col lg:flex-row lg:items-center gap-8">
             @if (plotted().length >= minAxes) {
-                <div class="h-96 w-full lg:w-[28rem] shrink-0">
-                    <p-chart appChartResize type="radar" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="description()" />
+                <div class="w-full lg:w-[28rem] shrink-0">
+                    <div class="h-96">
+                        <p-chart appChartResize type="radar" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="description()" />
+                    </div>
+                    <ul class="list-none flex flex-wrap justify-center gap-x-4 gap-y-1 p-0 m-0 mt-4 text-sm text-muted-color">
+                        @for (band of bands; track band.tone; let index = $index) {
+                            <li class="flex items-center gap-2">
+                                <span class="inline-block w-3 h-3 rounded-sm shrink-0" aria-hidden="true" [style.background-color]="theme().sentiment[band.tone]"></span>
+                                <span><span class="tabular-nums">{{ band.from }}–{{ (bands[index + 1]?.from ?? 101) - 1 }}</span> {{ band.label }}</span>
+                            </li>
+                        }
+                    </ul>
                 </div>
             } @else {
                 <p class="text-muted-color m-0! lg:w-[28rem] shrink-0">Ainda não há dados suficientes para desenhar o perfil. Ele aparece quando a carteira tiver posições com cotação.</p>
@@ -60,29 +90,33 @@ export class PortfolioRadarChart {
     readonly axes = input.required<RadarAxis[]>();
 
     protected readonly minAxes = MIN_AXES;
-    private readonly theme = computed(() => chartTheme(this.layoutService.isDarkTheme()));
+    protected readonly bands = RADAR_BANDS;
+    protected readonly theme = computed(() => chartTheme(this.layoutService.isDarkTheme()));
 
     /** Um aspecto sem dados sai do desenho, em vez de parecer uma nota zero. */
     protected readonly plotted = computed(() => this.axes().filter((axis): axis is RadarAxis & { score: number } => axis.score !== null));
 
-    protected readonly description = computed(() => `Gráfico de radar do perfil da carteira, com notas de 0 a 100: ${this.plotted().map((axis) => `${axis.label} ${Math.round(axis.score)}`).join(', ')}.`);
+    protected readonly description = computed(() => `Gráfico de radar do perfil da carteira, com notas de 0 a 100: ${this.plotted().map((axis) => `${axis.label} ${Math.round(axis.score)}, ${radarBand(axis.score).label}`).join(', ')}.`);
 
     protected readonly chartData = computed(() => {
         const theme = this.theme();
-        const color = theme.series[0];
+        const colors = this.plotted().map((axis) => theme.sentiment[radarBand(axis.score).tone]);
+        const fills = colors.map((color) => `${color}${FILL_ALPHA}`);
         return {
             labels: this.plotted().map((axis) => axis.label),
             datasets: [
                 {
                     label: 'Nota',
                     data: this.plotted().map((axis) => axis.score),
-                    borderColor: color,
-                    backgroundColor: `${color}${FILL_ALPHA}`,
+                    borderColor: (context: RadarContext) => vertexGradient(context, colors),
+                    backgroundColor: (context: RadarContext) => vertexGradient(context, fills),
                     borderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: color,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: colors,
+                    pointHoverBackgroundColor: colors,
                     pointBorderColor: theme.surface,
+                    pointHoverBorderColor: theme.surface,
                     pointBorderWidth: 2,
                     pointHitRadius: 16
                 }
@@ -97,7 +131,7 @@ export class PortfolioRadarChart {
             plugins: {
                 // Uma só série: o título do cartão já diz o que ela é.
                 legend: { display: false },
-                tooltip: { callbacks: { label: (item: { parsed: { r: number } }) => `${Math.round(item.parsed.r)} de 100` } }
+                tooltip: { callbacks: { label: (item: { parsed: { r: number } }) => `${Math.round(item.parsed.r)} de 100: ${radarBand(item.parsed.r).label}` } }
             },
             scales: {
                 r: {

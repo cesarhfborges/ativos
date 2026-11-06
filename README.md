@@ -294,7 +294,7 @@ A tela sempre mostra os dois juntos, porque um RSI baixo em tendência de baixa 
 
 ## Perfil da carteira
 
-O Painel mostra um gráfico de radar com seis notas de 0 a 100, sempre com 100 no lado favorável. Elas descrevem a carteira e não são recomendação de investimento. Um aspecto sem dados sai do desenho, em vez de parecer nota zero.
+O Painel mostra um gráfico de radar com seis notas de 0 a 100, sempre com 100 no lado favorável. Elas descrevem a carteira e não são recomendação de investimento. Um aspecto sem dados sai do desenho, em vez de parecer nota zero. Cada vértice tem a cor da faixa da nota: vermelho de 0 a 33 (baixa), azul de 34 a 66 (média) e verde de 67 a 100 (alta).
 
 | Aspecto | Como é medido | Escala |
 | --- | --- | --- |
@@ -311,7 +311,7 @@ A diversificação olha só os pesos: 10 criptomoedas de mesmo peso também vale
 
 ## Ganância e medo
 
-O Painel mostra um índice de 0 (medo extremo) a 100 (ganância extrema), com um medidor da leitura atual e a curva do período, em vermelho (medo), azul (neutro) e verde (ganância). Ele usa só os fechamentos gravados e nunca chama os provedores. Sem volume, opções ou redes sociais, descreve o comportamento dos preços, não o humor do mercado; não prevê o futuro e não é recomendação de investimento.
+O Painel mostra um índice de 0 (medo extremo) a 100 (ganância extrema), com um medidor da leitura atual e a curva do período, com uma cor por faixa: vermelho escuro, laranja, azul, verde-claro e verde escuro. Ele usa só os fechamentos gravados e nunca chama os provedores. Sem volume, opções ou redes sociais, descreve o comportamento dos preços, não o humor do mercado; não prevê o futuro e não é recomendação de investimento.
 
 | Componente (25% cada) | Cálculo | Nota |
 | --- | --- | --- |

@@ -1,5 +1,5 @@
 import { DashboardPosition, MarketAsset, WatchlistItem } from './api.models';
-import { annualVolatility, portfolioRadar } from './portfolio-radar';
+import { annualVolatility, portfolioRadar, radarBand } from './portfolio-radar';
 
 const position = (symbol: string, marketValue: number, investedValue = marketValue, currentPrice: number | null = 1) => ({ symbol, marketValue, investedValue, profitLoss: marketValue - investedValue, currentPrice }) as DashboardPosition;
 const axis = (axes: ReturnType<typeof portfolioRadar>, key: string) => axes.find((item) => item.key === key)!;
@@ -10,6 +10,13 @@ const covering = (symbol: string, periodChangePercent: number | null, days = 30)
 const radar = (positions: DashboardPosition[], market: MarketAsset[] = [], watchlist: WatchlistItem[] | null = [], days = 30) => portfolioRadar(positions, market, watchlist, days, `${days} dias`);
 
 describe('portfolio-radar', () => {
+    it('cada nota cai na faixa do número mostrado, até nos limites', () => {
+        const tone = (score: number) => radarBand(score).tone;
+        expect([0, 33, 33.4].map(tone)).toEqual(['extremeFear', 'extremeFear', 'extremeFear']);
+        expect([33.5, 50, 66.4].map(tone)).toEqual(['neutral', 'neutral', 'neutral']);
+        expect([66.5, 67, 100].map(tone)).toEqual(['greed', 'greed', 'greed']);
+    });
+
     it('sem posições, nenhuma nota é inventada', () => {
         expect(radar([]).every((item) => item.score === null)).toBeTrue();
     });

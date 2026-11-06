@@ -1,4 +1,5 @@
 import { DashboardPosition, MarketAsset, WatchlistItem } from './api.models';
+import { SentimentTone } from './chart-theme';
 import { shortHistoryDays } from './market';
 
 export interface RadarAxis {
@@ -10,6 +11,26 @@ export interface RadarAxis {
     detail: string;
     /** Como a nota é medida. */
     hint: string;
+}
+
+export interface RadarBand {
+    label: string;
+    tone: SentimentTone;
+    /** Nota inicial da faixa, inclusive. */
+    from: number;
+}
+
+/** Em ordem crescente. O verde é o tom "greed", e não o mais escuro: este se confunde com o vermelho no daltonismo. */
+export const RADAR_BANDS: readonly RadarBand[] = [
+    { label: 'Baixa', tone: 'extremeFear', from: 0 },
+    { label: 'Média', tone: 'neutral', from: 34 },
+    { label: 'Alta', tone: 'greed', from: 67 }
+];
+
+/** A nota é arredondada antes, para a cor não contradizer o número mostrado. */
+export function radarBand(score: number): RadarBand {
+    const rounded = Math.round(score);
+    return RADAR_BANDS.filter((band) => rounded >= band.from).at(-1) ?? RADAR_BANDS[0];
 }
 
 /** Com esse número de ativos de mesmo peso, a diversificação já é considerada completa. */

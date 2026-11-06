@@ -53,6 +53,33 @@ market:
     # Sem token, a Brapi só responde para alguns ativos de teste (PETR4, VALE3, ITUB4 e MGLU3).
     token: ${BRAPI_TOKEN:}
 
+# Com enabled=false, /api/predictions deixa de existir e o restante do sistema não muda.
+predictive:
+  enabled: ${PREDICTIVE_ENABLED:true}
+  # Abaixo disso, o retorno observado não é confiável e valem as premissas de referência.
+  min-history-days: 90
+  # Limites do retorno anual observado: pouco histórico anualizado gera valores absurdos.
+  min-observed-return: -0.5
+  max-observed-return: 1.0
+  # z de uma distribuição normal para o intervalo de confiança de 80%.
+  confidence-level: 0.80
+  confidence-z: 1.2816
+  # Premissas anuais de referência, não são dados de mercado: ajuste conforme sua análise.
+  reference:
+    stock-return: 0.10
+    stock-volatility: 0.25
+    crypto-return: 0.20
+    crypto-volatility: 0.70
+  scenarios:
+    optimistic-return-bonus: 0.05
+    pessimistic-return-penalty: 0.05
+    # Queda imediata na classe de maior risco presente na carteira, só no cenário pessimista.
+    crypto-stress: 0.40
+    stock-stress: 0.20
+  risk:
+    max-crypto-share: 0.70
+    max-asset-share: 0.50
+
 springdoc:
   api-docs:
     enabled: ${SWAGGER_ENABLED:true}

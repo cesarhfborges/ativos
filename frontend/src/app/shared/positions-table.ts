@@ -1,5 +1,6 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { TableModule } from 'primeng/table';
 import { AssetType, DashboardPosition, Position } from '@/app/core/api.models';
@@ -9,11 +10,18 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 
 
 @Component({
     selector: 'app-positions-table',
-    imports: [ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, ProfitLoss, TableModule],
+    imports: [ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, ProfitLoss, RouterLink, TableModule],
     template: `@if (rows().length === 0) {
-            <p class="text-center text-muted-color py-8 m-0!">Você ainda não tem posições abertas. Registre sua primeira compra.</p>
+            <p class="text-center text-muted-color py-8 m-0!">
+                Você ainda não tem posições abertas.
+                @if (manageable()) {
+                    Registre sua primeira compra.
+                } @else {
+                    <a routerLink="/carteira" class="text-primary font-medium underline">Registre sua primeira compra na Carteira.</a>
+                }
+            </p>
         } @else {
-            <p-table [value]="rows()" dataKey="symbol" sortField="marketValue" [sortOrder]="-1" [tableStyle]="{ 'min-width': '64rem' }">
+            <p-table [value]="rows()" dataKey="symbol" sortField="marketValue" [sortOrder]="-1" [tableStyle]="{ 'min-width': manageable() ? '64rem' : '52rem' }">
                 <ng-template #header>
                     <tr>
                         <th scope="col" pSortableColumn="symbol">Ativo <p-sortIcon field="symbol" /></th>
@@ -23,7 +31,9 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 
                         <th scope="col" pSortableColumn="marketValue" class="text-right!">Valor a mercado <p-sortIcon field="marketValue" /></th>
                         <th scope="col" pSortableColumn="profitLoss" class="text-right!">Lucro/Prejuízo <p-sortIcon field="profitLoss" /></th>
                         <th scope="col" pSortableColumn="share" class="text-right!">% da carteira <p-sortIcon field="share" /></th>
-                        <th scope="col" class="text-right!">Ações</th>
+                        @if (manageable()) {
+                            <th scope="col" class="text-right!">Ações</th>
+                        }
                     </tr>
                 </ng-template>
                 <ng-template #body let-row>
@@ -51,16 +61,20 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 
                             }
                         </td>
                         <td class="text-right">{{ row.share | number: '1.1-1' }}%</td>
-                        <td class="text-right whitespace-nowrap">
-                            <p-button label="Comprar" size="small" [text]="true" [ariaLabel]="'Comprar mais ' + row.symbol" (onClick)="buy.emit(row)" />
-                            <p-button label="Vender" size="small" severity="secondary" [text]="true" [ariaLabel]="'Vender ' + row.symbol" (onClick)="sell.emit(row)" />
-                        </td>
+                        @if (manageable()) {
+                            <td class="text-right whitespace-nowrap">
+                                <p-button label="Comprar" size="small" [text]="true" [ariaLabel]="'Comprar mais ' + row.symbol" (onClick)="buy.emit(row)" />
+                                <p-button label="Vender" size="small" severity="secondary" [text]="true" [ariaLabel]="'Vender ' + row.symbol" (onClick)="sell.emit(row)" />
+                            </td>
+                        }
                     </tr>
                 </ng-template>
             </p-table>
         }`
 })
 export class PositionsTable {
+    /** Com as ações de comprar e vender, que só existem na Carteira. */
+    readonly manageable = input(false);
     readonly positions = input.required<DashboardPosition[]>();
     /** Patrimônio usado como base do percentual de cada posição. */
     readonly total = input.required<number>();

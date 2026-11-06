@@ -1,20 +1,23 @@
 import { Component, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { PasswordModule } from 'primeng/password';
+import { InvestorProfile } from '@/app/core/api.models';
 import { errorMessage, fieldErrors } from '@/app/core/api-error';
 import { AuthService } from '@/app/core/auth.service';
-import { applyFieldErrors, controlError, maxBytes } from '@/app/core/form-errors';
+import { toIsoDate } from '@/app/core/operation-date';
+import { applyFieldErrors, controlError, maxBytes, passwordsMatch, phoneFormat } from '@/app/core/form-errors';
+import { ProfileFields } from '../profile/profile-fields';
 import { AuthCard } from './auth-card';
 
 @Component({
     selector: 'app-register',
-    imports: [AuthCard, ButtonModule, InputTextModule, MessageModule, PasswordModule, ReactiveFormsModule, RouterLink],
+    imports: [AuthCard, ButtonModule, InputTextModule, MessageModule, PasswordModule, ProfileFields, ReactiveFormsModule, RouterLink],
     template: `
         <app-auth-card title="Criar conta" subtitle="Comece a acompanhar seus investimentos">
             <form class="flex flex-col gap-6" novalidate [formGroup]="form" (ngSubmit)="submit()">
@@ -67,6 +70,16 @@ import { AuthCard } from './auth-card';
                     }
                 </div>
 
+                <div class="flex flex-col gap-2">
+                    <label for="register-confirm-password" class="font-medium">Confirmar senha</label>
+                    <p-password inputId="register-confirm-password" autocomplete="new-password" formControlName="confirmPassword" [feedback]="false" [toggleMask]="true" [fluid]="true" [invalid]="!!confirmError()" />
+                    @if (confirmError(); as message) {
+                        <p-message severity="error" size="small" variant="simple" [text]="message" />
+                    }
+                </div>
+
+                <app-profile-fields idPrefix="register" [form]="form" />
+
                 <p-button type="submit" label="Criar conta" styleClass="w-full" [loading]="submitting()" />
             </form>
 
@@ -82,11 +95,18 @@ export class Register {
     private readonly router = inject(Router);
     private readonly messages = inject(MessageService);
 
-    protected readonly form = inject(NonNullableFormBuilder).group({
-        name: ['', [Validators.required, Validators.maxLength(120)]],
-        email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
-        password: ['', [Validators.required, Validators.minLength(8), maxBytes(72)]]
-    });
+    protected readonly form = inject(FormBuilder).group(
+        {
+            name: ['', [Validators.required, Validators.maxLength(120)]],
+            email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
+            password: ['', [Validators.required, Validators.minLength(8), maxBytes(72)]],
+            confirmPassword: ['', [Validators.required]],
+            phone: ['', [phoneFormat]],
+            birthDate: [null as Date | null],
+            investorProfile: [null as InvestorProfile | null]
+        },
+        { validators: passwordsMatch('password', 'confirmPassword') }
+    );
     private readonly formEvents = toSignal(this.form.events);
 
     protected readonly submitting = signal(false);
@@ -97,14 +117,21 @@ export class Register {
         return controlError(this.form.controls[name]);
     }
 
+    protected confirmError(): string | null {
+        this.formEvents();
+        const control = this.form.controls.confirmPassword;
+        return controlError(control) ?? (control.touched && this.form.hasError('passwordMismatch') ? 'As senhas não coincidem.' : null);
+    }
+
     protected submit(): void {
         this.form.markAllAsTouched();
-        if (this.form.invalid || this.submitting()) {
+        const { name, email, password, confirmPassword, phone, birthDate, investorProfile } = this.form.getRawValue();
+        if (this.form.invalid || !name || !email || !password || !confirmPassword || this.submitting()) {
             return;
         }
         this.submitting.set(true);
         this.failure.set(null);
-        this.auth.register(this.form.getRawValue()).subscribe({
+        this.auth.register({ name, email, password, confirmPassword, phone: phone?.trim() || null, birthDate: toIsoDate(birthDate), investorProfile }).subscribe({
             next: () => {
                 this.messages.add({ severity: 'success', closable: false, summary: 'Conta criada', detail: 'Agora é só entrar com seu e-mail e senha.' });
                 void this.router.navigate(['/auth/login']);

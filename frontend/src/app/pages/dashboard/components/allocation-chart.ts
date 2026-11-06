@@ -13,7 +13,7 @@ const COLORS: Record<'light' | 'dark', Record<AllocationKey, string>> = {
 @Component({
     selector: 'app-allocation-chart',
     imports: [ChartModule, CurrencyPipe, DecimalPipe],
-    template: `<div class="card mb-0 h-full">
+    template: `<div class="card mb-0! h-full">
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Alocação da carteira</h2>
         <p class="text-muted-color mt-0! mb-6!">Criptomoedas e ações, a valor de mercado.</p>
 

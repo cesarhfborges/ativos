@@ -8,13 +8,15 @@ import { TableModule } from 'primeng/table';
 import { Transaction, TransactionType } from '@/app/core/api.models';
 import { errorMessage } from '@/app/core/api-error';
 import { TRANSACTION_DISPLAY } from '@/app/core/transaction-display';
+import { TransactionReversalService } from '@/app/core/transaction-reversal.service';
 import { WalletService } from '@/app/core/wallet.service';
+import { ProfitLoss } from '@/app/shared/profit-loss';
 
 const PAGE_SIZE = 20;
 
 @Component({
     selector: 'app-statement',
-    imports: [FormsModule, ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, MessageModule, SelectModule, TableModule],
+    imports: [FormsModule, ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, MessageModule, ProfitLoss, SelectModule, TableModule],
     template: `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-3xl! font-semibold m-0!">Extrato</h1>
@@ -30,7 +32,7 @@ const PAGE_SIZE = 20;
                 <p-button label="Tentar novamente" icon="pi pi-refresh" [loading]="loading()" (onClick)="load(page())" />
             } @else {
                 <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Lançamentos do extrato">
-                    <p-table class="block min-w-[52rem]" [value]="transactions()" dataKey="id" [loading]="loading()">
+                    <p-table class="block min-w-[60rem]" [value]="transactions()" dataKey="id" [loading]="loading()">
                         <ng-template #header>
                             <tr>
                                 <th scope="col">Data</th>
@@ -40,10 +42,12 @@ const PAGE_SIZE = 20;
                                 <th scope="col" class="text-right!">Preço unitário</th>
                                 <th scope="col" class="text-right!">Taxa</th>
                                 <th scope="col" class="text-right!">Total</th>
+                                <th scope="col" class="text-right!">Lucro realizado</th>
+                                <th scope="col" class="text-right!">Situação</th>
                             </tr>
                         </ng-template>
                         <ng-template #body let-transaction>
-                            <tr>
+                            <tr [class.text-muted-color]="transaction.reversedAt">
                                 <td class="whitespace-nowrap">{{ transaction.timestamp | date: 'short' }}</td>
                                 <td class="whitespace-nowrap"><i class="mr-2 {{ display(transaction.type).icon }}" aria-hidden="true"></i>{{ display(transaction.type).label }}</td>
                                 <td>{{ transaction.symbol }}</td>
@@ -54,12 +58,34 @@ const PAGE_SIZE = 20;
                                     {{ transaction.unitPrice | currency: 'BRL' : 'symbol' : '1.2-4' }}
                                 </td>
                                 <td class="text-right">{{ transaction.fee | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
-                                <td class="text-right font-medium whitespace-nowrap">{{ transaction.totalAmount | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
+                                <td class="text-right font-medium whitespace-nowrap" [class.line-through]="transaction.reversedAt">{{ transaction.totalAmount | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
+                                <td class="text-right whitespace-nowrap">
+                                    @if (transaction.realizedProfit !== null) {
+                                        <app-profit-loss [class.line-through]="transaction.reversedAt" [value]="transaction.realizedProfit" />
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                                <td class="text-right whitespace-nowrap">
+                                    @if (transaction.reversedAt) {
+                                        <div class="font-medium"><i class="pi pi-undo mr-1" aria-hidden="true"></i>Estornada</div>
+                                        <div class="text-muted-color text-sm">{{ transaction.reversedAt | date: 'short' }}</div>
+                                    } @else {
+                                        <p-button
+                                            label="Estornar"
+                                            size="small"
+                                            severity="secondary"
+                                            [text]="true"
+                                            [ariaLabel]="'Estornar ' + display(transaction.type).label.toLowerCase() + ' de ' + transaction.symbol"
+                                            (onClick)="reverse(transaction)"
+                                        />
+                                    }
+                                </td>
                             </tr>
                         </ng-template>
                         <ng-template #emptymessage>
                             <tr>
-                                <td colspan="7" class="text-center text-muted-color py-8">{{ page() === 0 ? 'Nenhum lançamento registrado ainda.' : 'Não há mais lançamentos.' }}</td>
+                                <td colspan="9" class="text-center text-muted-color py-8">{{ page() === 0 ? 'Nenhum lançamento registrado ainda.' : 'Não há mais lançamentos.' }}</td>
                             </tr>
                         </ng-template>
                     </p-table>
@@ -76,6 +102,7 @@ const PAGE_SIZE = 20;
 })
 export class Statement implements OnInit {
     private readonly wallet = inject(WalletService);
+    private readonly reversal = inject(TransactionReversalService);
 
     protected readonly filterOptions: { label: string; value: TransactionType | null }[] = [
         { label: 'Todos', value: null },
@@ -108,6 +135,10 @@ export class Statement implements OnInit {
                 this.loading.set(false);
             }
         });
+    }
+
+    protected reverse(transaction: Transaction): void {
+        this.reversal.reverse(transaction, () => this.load(this.page()));
     }
 
     protected applyFilter(type: TransactionType | null): void {

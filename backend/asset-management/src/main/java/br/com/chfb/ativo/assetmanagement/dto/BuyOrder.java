@@ -2,8 +2,15 @@ package br.com.chfb.ativo.assetmanagement.dto;
 
 import br.com.chfb.ativo.assetmanagement.entity.AssetType;
 import java.math.BigDecimal;
+import java.time.Instant;
 
-/** {@code name} é usado só no primeiro cadastro do ativo; sem ele, vale o símbolo. */
+/** {@code name} é usado só no primeiro cadastro do ativo; sem {@code executedAt}, a operação é de agora. */
 public record BuyOrder(
-        String symbol, String name, AssetType assetType, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fee) {
+        String symbol,
+        String name,
+        AssetType assetType,
+        BigDecimal quantity,
+        BigDecimal unitPrice,
+        BigDecimal fee,
+        Instant executedAt) {
 }

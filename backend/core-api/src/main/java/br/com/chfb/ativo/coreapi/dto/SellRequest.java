@@ -5,9 +5,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
+import java.time.Instant;
 
 public record SellRequest(
         @Schema(example = "BTC")
@@ -30,9 +32,13 @@ public record SellRequest(
         @Schema(example = "1.50", description = "Sem valor, a taxa é zero.")
         @PositiveOrZero
         @Digits(integer = 14, fraction = 4)
-        BigDecimal fee) {
+        BigDecimal fee,
+
+        @Schema(description = "Quando a operação aconteceu. Sem valor, é agora.")
+        @PastOrPresent(message = "A data da operação não pode estar no futuro")
+        Instant executedAt) {
 
     public SellOrder toOrder() {
-        return new SellOrder(symbol, quantity, unitPrice, fee == null ? BigDecimal.ZERO : fee);
+        return new SellOrder(symbol, quantity, unitPrice, fee == null ? BigDecimal.ZERO : fee, executedAt);
     }
 }

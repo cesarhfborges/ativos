@@ -2,6 +2,7 @@ package br.com.chfb.ativo.coreapi.exception;
 
 import br.com.chfb.ativo.assetmanagement.exception.AssetTypeConflictException;
 import br.com.chfb.ativo.assetmanagement.exception.BusinessRuleException;
+import br.com.chfb.ativo.assetmanagement.exception.TransactionNotFoundException;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
@@ -25,9 +26,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 
+    @ExceptionHandler(InvalidCurrentPasswordException.class)
+    public ProblemDetail handleInvalidCurrentPassword(InvalidCurrentPasswordException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
     @ExceptionHandler(AssetTypeConflictException.class)
     public ProblemDetail handleAssetTypeConflict(AssetTypeConflictException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(TransactionNotFoundException.class)
+    public ProblemDetail handleTransactionNotFound(TransactionNotFoundException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(BusinessRuleException.class)

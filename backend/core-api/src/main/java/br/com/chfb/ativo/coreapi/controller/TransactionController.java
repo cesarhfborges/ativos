@@ -18,10 +18,12 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -111,5 +113,29 @@ public class TransactionController {
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @Valid @RequestBody SellRequest body) {
         return walletService.sell(user.getId(), body.toOrder());
+    }
+
+    @Operation(
+            summary = "Estorna uma compra ou venda",
+            description = "A operação continua no histórico, marcada como estornada, e a posição é refeita a partir "
+                    + "das demais. O lucro realizado das vendas posteriores pode mudar.")
+    @ApiResponse(responseCode = "200", description = "Operação estornada")
+    @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada", content = @Content)
+    @ApiResponse(
+            responseCode = "404",
+            description = "Operação não encontrada",
+            content = @Content(
+                    mediaType = "application/problem+json",
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "422",
+            description = "Já estornada, ou uma venda posterior ficaria sem custódia",
+            content = @Content(
+                    mediaType = "application/problem+json",
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @PostMapping("/{id}/reverse")
+    public TransactionResponse reverse(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
+        return walletService.reverse(user.getId(), id);
     }
 }

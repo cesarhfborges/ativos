@@ -9,7 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.chfb.ativo.assetmanagement.service.DashboardService;
 import br.com.chfb.ativo.assetmanagement.service.WalletService;
 import br.com.chfb.ativo.markettracker.service.QuoteCollector;
+import br.com.chfb.ativo.predictiveengine.service.PredictionService;
 import br.com.chfb.ativo.coreapi.service.AuthService;
+import br.com.chfb.ativo.coreapi.service.ProfileService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -37,6 +39,12 @@ class SecurityConfigTest {
 
     @MockitoBean
     private QuoteCollector quoteCollector;
+
+    @MockitoBean
+    private PredictionService predictionService;
+
+    @MockitoBean
+    private ProfileService profileService;
 
     @MockitoBean
     private AuthenticationManager authenticationManager;

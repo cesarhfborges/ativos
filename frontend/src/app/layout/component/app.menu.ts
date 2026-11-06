@@ -6,7 +6,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     imports: [RouterLink, RouterLinkActive],
     template: `<ul class="layout-menu">
         <li class="layout-root-menuitem">
-            <div class="layout-menuitem-root-text">Carteira</div>
+            <div class="layout-menuitem-root-text">Investimentos</div>
             <ul class="layout-root-submenulist">
                 @for (item of items; track item.link) {
                     <li>
@@ -23,6 +23,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 export class AppMenu {
     protected readonly items = [
         { label: 'Painel', icon: 'pi pi-fw pi-home', link: '/' },
-        { label: 'Extrato', icon: 'pi pi-fw pi-list', link: '/extrato' }
+        { label: 'Carteira', icon: 'pi pi-fw pi-wallet', link: '/carteira' },
+        { label: 'Extrato', icon: 'pi pi-fw pi-list', link: '/extrato' },
+        { label: 'Projeções', icon: 'pi pi-fw pi-chart-line', link: '/projecoes' },
+        { label: 'Meu perfil', icon: 'pi pi-fw pi-user', link: '/perfil' }
     ];
 }

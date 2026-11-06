@@ -4,7 +4,7 @@ import { Component, input } from '@angular/core';
 @Component({
     selector: 'app-stat-card',
     imports: [CurrencyPipe],
-    template: `<div class="card mb-0 h-full">
+    template: `<div class="card mb-0! h-full">
         <div class="flex justify-between gap-4 mb-4">
             <div>
                 <div class="text-muted-color font-medium mb-4">{{ label() }}</div>

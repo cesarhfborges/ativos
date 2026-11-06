@@ -2,7 +2,7 @@
 
 Sistema multiusuário para acompanhar carteiras de ações e criptomoedas: patrimônio, rentabilidade, histórico e projeções. O escopo completo está em [`docs/`](docs/).
 
-O repositório contém autenticação, registro de compras e vendas, coleta de cotações, dashboard e o frontend que usa esses recursos. Projeções (Etapa 5) ainda não existem.
+O repositório contém autenticação, registro de compras e vendas, coleta de cotações, dashboard, projeções e o frontend que usa esses recursos. Todos os valores são tratados como BRL; o suporte a outras moedas está planejado em [`docs/07_plano_multimoeda.md`](docs/07_plano_multimoeda.md).
 
 ## Stack
 
@@ -73,6 +73,7 @@ Variáveis do `application.yml`:
 | `BRAPI_TOKEN` | Vazio | Token da Brapi; sem ele, só alguns ativos de teste têm cotação (PETR4, VALE3, ITUB4 e MGLU3) |
 | `MARKET_COLLECTION_CRON` | `0 0 * * * *` | Agenda da coleta que gera os snapshots patrimoniais |
 | `MARKET_COLLECT_ON_STARTUP` | `true` | Atualiza as cotações ao iniciar, sem gerar snapshot |
+| `PREDICTIVE_ENABLED` | `true` | Liga o módulo de projeções |
 
 Os padrões são apenas de desenvolvimento: em produção, defina todas elas. O que estiver no `application-local.yml` tem prioridade sobre `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` quando o perfil `local` está ativo.
 
@@ -141,7 +142,7 @@ npm test -- --watch=false --browsers=ChromeHeadless
 
 No `docker compose up --build`, o frontend sobe em <http://localhost:4200>, servido pelo Nginx, que encaminha `/api/` ao backend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
 
-Telas: login, registro, painel (patrimônio, desempenho, posições a mercado, evolução patrimonial, alocação e últimas operações, com registro de compra e venda) e extrato com filtro por tipo. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
+Telas: login, registro, painel para acompanhamento (patrimônio, desempenho, posições a mercado, evolução patrimonial, alocação e últimas operações), carteira para registrar compras e vendas,xtrato com filtro por tipo e lucro realizado, e projeções. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
 
 ## Documentação da API
 
@@ -161,10 +162,13 @@ A sessão usa o cookie `JSESSIONID`, e todo `POST` exige o token CSRF: o valor d
 | Endpoint | Sessão | Descrição | Respostas |
 | --- | --- | --- | --- |
 | `GET /api/auth/csrf` | Não | Entrega o cookie `XSRF-TOKEN`; chame antes do primeiro `POST` e depois do logout | `204` |
-| `POST /api/auth/register` | Não | Cria a conta, sem iniciar sessão. Corpo: `name`, `email`, `password` (mínimo de 8 caracteres) | `201`, `400`, `409` |
+| `POST /api/auth/register` | Não | Cria a conta, sem iniciar sessão. Corpo: `name`, `email`, `password` (mínimo de 8 caracteres), `confirmPassword` e, opcionais, `phone`, `birthDate` e `investorProfile` | `201`, `400`, `409` |
 | `POST /api/auth/login` | Não | Inicia a sessão e renova o token CSRF. Corpo: `email`, `password` | `200`, `400`, `401` |
 | `GET /api/auth/me` | Sim | Retorna o usuário logado | `200`, `401` |
 | `POST /api/auth/logout` | Sim | Encerra a sessão | `204` |
+| `GET /api/profile` | Sim | Retorna o perfil completo | `200`, `401` |
+| `PUT /api/profile` | Sim | Atualiza `name`, `phone`, `birthDate` e `investorProfile` (`CONSERVATIVE`, `MODERATE` ou `AGGRESSIVE`); o e-mail não muda | `200`, `400`, `401` |
+| `POST /api/profile/password` | Sim | Troca a senha: `currentPassword`, `newPassword` e `confirmPassword`. Encerra as outras sessões | `204`, `400`, `401`, `422` |
 
 Para testar pelo terminal:
 
@@ -175,7 +179,7 @@ TOKEN=$(awk '$6 == "XSRF-TOKEN" {print $7}' cookies.txt)
 HEADERS=(-H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN")
 
 curl -b cookies.txt -c cookies.txt "${HEADERS[@]}" $API/register \
-  -d '{"name":"Ana","email":"ana@example.com","password":"senha-forte-123"}'
+  -d '{"name":"Ana","email":"ana@example.com","password":"senha-forte-123","confirmPassword":"senha-forte-123"}'
 curl -b cookies.txt -c cookies.txt "${HEADERS[@]}" $API/login \
   -d '{"email":"ana@example.com","password":"senha-forte-123"}'
 curl -b cookies.txt $API/me
@@ -193,6 +197,30 @@ A coleta de hora cheia consulta só os símbolos com posição aberta, grava a �
 | `POST /api/dashboard/refresh-quotes` | Atualiza as cotações agora, uma vez por minuto no máximo, sem gerar snapshot |
 
 Para adicionar um provedor, implemente `CryptoMarketProvider` ou `StockMarketProvider` com `@ConditionalOnProperty` e aponte `market.provider.*` para ele.
+
+## Busca de ativos
+
+`GET /api/assets?query=pe` procura no catálogo de ativos já cadastrados, compartilhado entre os usuários, pelo início do símbolo ou por parte do nome. A tela de compra usa essa busca para sugerir o símbolo e preencher o tipo; símbolos novos continuam aceitos e são cadastrados na primeira compra.
+
+## Data da operação
+
+`POST /api/transactions/buy` e `/sell` aceitam `executedAt` (ISO 8601), para lançar operações passadas; sem ele, vale o momento atual, e datas futuras são recusadas. Toda operação refaz a posição a partir do histórico, em ordem de data, então um lançamento retroativo recalcula o preço médio e o lucro das vendas seguintes, e é recusado (`422`) se deixar alguma venda sem quantidade. A coluna `recorded_at` guarda quando o lançamento foi feito.
+
+## Estorno
+
+`POST /api/transactions/{id}/reverse` corrige uma compra ou venda registrada por engano. Nada é apagado: a operação continua no extrato como estornada, e a posição é refeita a partir das demais, em ordem, recalculando o preço médio e o lucro realizado das vendas seguintes.
+
+O estorno é recusado (`422`) se uma venda posterior ficaria sem quantidade: nesse caso, estorne a venda antes. Os snapshots antigos não são reescritos, nem no estorno nem em lançamentos retroativos: o histórico patrimonial mostra o que estava registrado naquele momento.
+
+## Projeções
+
+`POST /api/predictions/simulate` recebe `months` (6, 12, 24 ou 60), `monthlyContribution` e `scenario` (`OPTIMISTIC`, `REALISTIC` ou `PESSIMISTIC`) e devolve a curva com intervalo de confiança de 80%, as premissas e os alertas de risco.
+
+- **Retorno e volatilidade:** com 90 dias ou mais de snapshots, são medidos na carteira, descontando o efeito de novas compras e limitando o retorno anual a uma faixa de -50% a +100%. Com menos, valem os valores de referência de `predictive.reference`, que são premissas configuradas, não dados de mercado.
+- **Cenários:** o otimista soma 5 pontos percentuais ao retorno anual; o pessimista subtrai 5 e aplica uma queda imediata de 40% em cripto (ou de 20% em ações, se não houver cripto).
+- **Alertas:** mais de 70% em cripto ou mais de 50% em um único ativo.
+
+Tudo isso é ajustável em `predictive.*` no `application.yml`. Com `PREDICTIVE_ENABLED=false`, o endpoint deixa de existir e o restante do sistema não muda.
 
 ## Deploy em Tomcat
 
@@ -227,7 +255,7 @@ O Flyway não gerencia as tabelas `spring_session*`: o próprio Spring Session a
 | 2. Gestão de ativos | Concluída |
 | 3. Cotações e provedores | Concluída |
 | 4. Dashboard | Concluída |
-| 5. Predição e análise | Não iniciada |
+| 5. Predição e análise | Concluída |
 
 ## Comandos úteis
 

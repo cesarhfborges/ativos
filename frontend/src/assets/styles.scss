@@ -1,3 +1,9 @@
 /* You can add global styles to this file, and also import other style files */
 @use 'primeicons/primeicons.css';
 @use '@/assets/layout/layout.scss';
+
+/* O padrão do tema só reduz a opacidade, e o dia desativado fica abaixo do contraste AA. */
+.p-datepicker-day.p-disabled {
+    opacity: 1;
+    color: var(--p-text-muted-color);
+}

@@ -10,6 +10,15 @@ export const maxBytes =
 /** Rejeita zero e negativos; o `required` cuida do campo vazio. */
 export const positive: ValidatorFn = (control: AbstractControl): ValidationErrors | null => (control.value !== null && control.value <= 0 ? { positive: true } : null);
 
+/** Mesmo formato aceito pelo backend. Vazio é válido, porque o campo é opcional. */
+export const phoneFormat: ValidatorFn = (control: AbstractControl): ValidationErrors | null => (control.value && !/^\+?[0-9 ()-]{8,20}$/.test(String(control.value).trim()) ? { phone: true } : null);
+
+/** Validador de grupo: o erro aparece no formulário, e a tela o mostra no campo de confirmação. */
+export const passwordsMatch =
+    (passwordField: string, confirmField: string): ValidatorFn =>
+    (group: AbstractControl): ValidationErrors | null =>
+        group.get(passwordField)?.value === group.get(confirmField)?.value ? null : { passwordMismatch: true };
+
 /** Texto do primeiro erro de um campo, ou `null` se não houver o que mostrar ainda. */
 export function controlError(control: AbstractControl | null): string | null {
     if (!control?.errors || !control.touched) {
@@ -18,6 +27,7 @@ export function controlError(control: AbstractControl | null): string | null {
     const errors = control.errors;
     if (errors['server']) return String(errors['server']);
     if (errors['required']) return 'Preencha este campo.';
+    if (errors['phone']) return 'Use de 8 a 20 dígitos, como +55 11 91234-5678.';
     if (errors['email']) return 'Informe um e-mail válido.';
     if (errors['minlength']) return `Use pelo menos ${errors['minlength'].requiredLength} caracteres.`;
     if (errors['maxlength']) return `Use no máximo ${errors['maxlength'].requiredLength} caracteres.`;

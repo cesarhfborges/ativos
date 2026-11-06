@@ -47,6 +47,7 @@ public class AuthService {
                 normalizeEmail(request.email()),
                 passwordEncoder.encode(request.password()),
                 Instant.now());
+        user.updateProfile(user.getName(), request.phone(), request.birthDate(), request.investorProfile());
         try {
             // A restrição UNIQUE decide: uma consulta prévia não cobriria registros simultâneos.
             return UserResponse.from(userRepository.saveAndFlush(user));

@@ -9,6 +9,7 @@ public record DashboardOverviewResponse(
         BigDecimal marketValue,
         BigDecimal profitLoss,
         BigDecimal profitLossPercent,
+        BigDecimal realizedProfit,
         int positionsWithoutQuote,
         Instant quotesUpdatedAt) {
 }

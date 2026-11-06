@@ -48,7 +48,7 @@ O banco armazena as tabelas de sessão, segurança, operações financeiras e co
 * `wallets`: `id (UUID)`, `user_id (FK)`, `name`
 * `assets`: `id (UUID)`, `symbol (VARCHAR)`, `name`, `asset_type (STOCK | CRYPTO)`
 * `wallet_positions`: `id (UUID)`, `wallet_id (FK)`, `asset_id (FK)`, `quantity (NUMERIC 24, 8)`, `average_price (NUMERIC 18, 4)`
-* `transactions`: `id (UUID)`, `wallet_id (FK)`, `asset_id (FK)`, `type (BUY | SELL)`, `quantity (NUMERIC 24, 8)`, `unit_price (NUMERIC 18, 4)`, `fee (NUMERIC 18, 4)`, `total_amount (NUMERIC 18, 4)`, `timestamp`
+* `transactions`: `id (UUID)`, `wallet_id (FK)`, `asset_id (FK)`, `type (BUY | SELL)`, `quantity (NUMERIC 24, 8)`, `unit_price (NUMERIC 18, 4)`, `fee (NUMERIC 18, 4)`, `total_amount (NUMERIC 18, 4)`, `realized_profit`, `timestamp`, `reversed_at`
 * `market_quotes`: `id (UUID)`, `symbol`, `price (NUMERIC 24, 8)`, `last_updated_at`
 * `portfolio_snapshots`: `id (UUID)`, `wallet_id (FK)`, `invested_balance`, `total_balance`, `snapshot_time`
 
@@ -60,6 +60,7 @@ O sistema não controla saldo em caixa: registra as operações que o usuário f
 1. **Compra:** registra a transação `BUY` e cria/atualiza a posição em `wallet_positions`, recalculando o preço médio.
 2. **Venda:** exige custódia suficiente, registra a transação `SELL` e reduz a posição.
 3. Ambas rodam em uma única transação atômica (`@Transactional`), e o histórico fica 100% auditável.
+4. **Estorno:** corrige um registro errado sem apagá-lo. A operação recebe `reversed_at`, sai dos cálculos e a posição é refeita a partir das operações válidas, em ordem, recalculando o preço médio e o lucro realizado das vendas seguintes. É recusado se uma venda posterior ficaria sem custódia.
 
 ---
 

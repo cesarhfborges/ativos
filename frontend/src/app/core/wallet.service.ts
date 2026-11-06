@@ -1,11 +1,15 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { BuyRequest, DashboardOverview, DashboardPosition, PortfolioHistoryPoint, SellRequest, Transaction, TransactionType } from './api.models';
+import { Asset, BuyRequest, DashboardOverview, DashboardPosition, PortfolioHistoryPoint, SellRequest, Transaction, TransactionType } from './api.models';
 
 @Injectable({ providedIn: 'root' })
 export class WalletService {
     private readonly http = inject(HttpClient);
+
+    searchAssets(query: string): Observable<Asset[]> {
+        return this.http.get<Asset[]>('/api/assets', { params: { query } });
+    }
 
     overview(): Observable<DashboardOverview> {
         return this.http.get<DashboardOverview>('/api/dashboard/overview');

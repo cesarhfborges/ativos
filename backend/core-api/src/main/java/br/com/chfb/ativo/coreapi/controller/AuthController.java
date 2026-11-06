@@ -6,6 +6,7 @@ import br.com.chfb.ativo.coreapi.dto.RegisterRequest;
 import br.com.chfb.ativo.coreapi.dto.UserResponse;
 import br.com.chfb.ativo.coreapi.security.AuthenticatedUser;
 import br.com.chfb.ativo.coreapi.service.AuthService;
+import br.com.chfb.ativo.coreapi.service.ProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,9 +32,11 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final ProfileService profileService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, ProfileService profileService) {
         this.authService = authService;
+        this.profileService = profileService;
     }
 
     @Operation(
@@ -97,6 +100,6 @@ public class AuthController {
     @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada", content = @Content)
     @GetMapping("/me")
     public UserResponse me(@Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user) {
-        return UserResponse.from(user);
+        return profileService.current(user.getId());
     }
 }

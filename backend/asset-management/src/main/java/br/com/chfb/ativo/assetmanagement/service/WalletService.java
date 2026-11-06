@@ -1,5 +1,6 @@
 package br.com.chfb.ativo.assetmanagement.service;
 
+import br.com.chfb.ativo.assetmanagement.dto.AssetResponse;
 import br.com.chfb.ativo.assetmanagement.dto.BuyOrder;
 import br.com.chfb.ativo.assetmanagement.dto.SellOrder;
 import br.com.chfb.ativo.assetmanagement.dto.TransactionResponse;
@@ -11,6 +12,7 @@ import br.com.chfb.ativo.assetmanagement.entity.WalletPosition;
 import br.com.chfb.ativo.assetmanagement.entity.WalletTransaction;
 import br.com.chfb.ativo.assetmanagement.exception.AssetTypeConflictException;
 import br.com.chfb.ativo.assetmanagement.exception.BusinessRuleException;
+import br.com.chfb.ativo.assetmanagement.exception.TransactionNotFoundException;
 import br.com.chfb.ativo.assetmanagement.repository.AssetRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletPositionRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletRepository;
@@ -27,8 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WalletService {
 
+    private static final int ASSET_SEARCH_LIMIT = 10;
     private static final String DEFAULT_WALLET_NAME = "Carteira principal";
-    private static final String INSUFFICIENT_POSITION = "Quantidade em custódia insuficiente";
+    private static final String INSUFFICIENT_POSITION =
+            "Quantidade em custódia insuficiente na data desta venda ou de uma venda posterior";
 
     private final WalletRepository walletRepository;
     private final AssetRepository assetRepository;
@@ -55,6 +59,14 @@ public class WalletService {
                 .orElseGet(List::of);
     }
 
+    @Transactional(readOnly = true)
+    public List<AssetResponse> searchAssets(String query) {
+        String term = query.strip().toUpperCase(Locale.ROOT).replaceAll("([!%_])", "!$1");
+        return assetRepository.search(term + "%", "%" + term + "%", PageRequest.of(0, ASSET_SEARCH_LIMIT)).stream()
+                .map(AssetResponse::from)
+                .toList();
+    }
+
     @Transactional
     public TransactionResponse buy(UUID userId, BuyOrder order) {
         Wallet wallet = lockWallet(userId);
@@ -64,13 +76,13 @@ public class WalletService {
         BigDecimal total = Amounts.money(quantity.multiply(unitPrice).add(fee));
 
         Asset asset = findOrRegisterAsset(order);
-        WalletPosition position = positionRepository.findByWalletIdAndAssetId(wallet.getId(), asset.getId())
-                .orElseGet(() -> new WalletPosition(wallet.getId(), asset));
-        position.addPurchase(quantity, unitPrice);
-        positionRepository.save(position);
+        if (positionRepository.findByWalletIdAndAssetId(wallet.getId(), asset.getId()).isEmpty()) {
+            positionRepository.save(new WalletPosition(wallet.getId(), asset));
+        }
+        WalletTransaction transaction = transactionRepository.save(WalletTransaction.buy(
+                wallet.getId(), asset, quantity, unitPrice, fee, total, order.executedAt()));
 
-        WalletTransaction transaction = transactionRepository.save(
-                WalletTransaction.buy(wallet.getId(), asset, quantity, unitPrice, fee, total));
+        rebuildPosition(wallet, asset, INSUFFICIENT_POSITION);
         return result(transaction);
     }
 
@@ -91,13 +103,62 @@ public class WalletService {
         if (net.signum() < 0) {
             throw new BusinessRuleException("A taxa não pode ser maior que o valor da venda");
         }
-        BigDecimal total = Amounts.money(net);
+        WalletTransaction transaction = transactionRepository.save(WalletTransaction.sell(
+                wallet.getId(),
+                asset,
+                quantity,
+                unitPrice,
+                fee,
+                Amounts.money(net),
+                realizedProfit(quantity, unitPrice, fee, position.getAveragePrice()),
+                order.executedAt()));
 
-        position.removeSold(quantity);
-
-        WalletTransaction transaction = transactionRepository.save(
-                WalletTransaction.sell(wallet.getId(), asset, quantity, unitPrice, fee, total));
+        rebuildPosition(wallet, asset, INSUFFICIENT_POSITION);
         return result(transaction);
+    }
+
+    /** O estorno não apaga a operação: ela só deixa de contar quando a posição é refeita. */
+    @Transactional
+    public TransactionResponse reverse(UUID userId, UUID transactionId) {
+        Wallet wallet = lockWallet(userId);
+        WalletTransaction transaction = transactionRepository.findByIdAndWalletId(transactionId, wallet.getId())
+                .orElseThrow(TransactionNotFoundException::new);
+        if (transaction.isReversed()) {
+            throw new BusinessRuleException("Esta operação já foi estornada");
+        }
+        transaction.markReversed();
+
+        Asset asset = transaction.getAsset();
+        rebuildPosition(
+                wallet,
+                asset,
+                "Não é possível estornar: uma venda posterior de %s ficaria sem quantidade em custódia. "
+                                .formatted(asset.getSymbol())
+                        + "Estorne essa venda antes.");
+        return result(transaction);
+    }
+
+    /**
+     * Refaz a posição a partir das operações válidas, em ordem de data. Uma operação no meio do histórico
+     * muda o preço médio e o lucro de tudo o que veio depois, e não pode deixar uma venda sem custódia.
+     */
+    private void rebuildPosition(Wallet wallet, Asset asset, String shortageMessage) {
+        WalletPosition recalculated = new WalletPosition(wallet.getId(), asset);
+        for (WalletTransaction active : transactionRepository.findActiveByWalletAndAsset(wallet.getId(), asset.getId())) {
+            if (active.getType() == TransactionType.BUY) {
+                recalculated.addPurchase(active.getQuantity(), active.getUnitPrice());
+            } else {
+                if (!recalculated.holds(active.getQuantity())) {
+                    throw new BusinessRuleException(shortageMessage);
+                }
+                active.updateRealizedProfit(realizedProfit(
+                        active.getQuantity(), active.getUnitPrice(), active.getFee(), recalculated.getAveragePrice()));
+                recalculated.removeSold(active.getQuantity());
+            }
+        }
+        positionRepository.findByWalletIdAndAssetId(wallet.getId(), asset.getId())
+                .orElseThrow()
+                .replaceWith(recalculated);
     }
 
     /** A carteira nasce na primeira operação do usuário. */
@@ -119,6 +180,12 @@ public class WalletService {
             throw new AssetTypeConflictException(symbol, asset.getAssetType());
         }
         return asset;
+    }
+
+    /** Valor líquido da venda menos o custo da quantidade vendida. */
+    private static BigDecimal realizedProfit(
+            BigDecimal quantity, BigDecimal unitPrice, BigDecimal fee, BigDecimal averagePrice) {
+        return Amounts.money(quantity.multiply(unitPrice).subtract(fee).subtract(quantity.multiply(averagePrice)));
     }
 
     private static String normalizeSymbol(String symbol) {

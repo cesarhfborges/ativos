@@ -16,7 +16,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
-/** Registro imutável do histórico de compras e vendas. */
+/**
+ * Registro do histórico de compras e vendas. Os dados da operação nunca mudam: um erro se corrige com
+ * estorno, e só o lucro realizado, que depende do preço médio, pode ser recalculado.
+ */
 @Entity
 @Table(name = "transactions")
 public class WalletTransaction {
@@ -48,8 +51,19 @@ public class WalletTransaction {
     @Column(name = "total_amount", nullable = false, precision = 18, scale = 4, updatable = false)
     private BigDecimal totalAmount;
 
+    /** Só em vendas: valor líquido menos o custo da quantidade vendida. */
+    @Column(name = "realized_profit", precision = 18, scale = 4)
+    private BigDecimal realizedProfit;
+
+    /** Quando a operação aconteceu, que pode ser antes de ela ser lançada. */
     @Column(nullable = false, updatable = false)
     private Instant timestamp;
+
+    @Column(name = "recorded_at", nullable = false, updatable = false)
+    private Instant recordedAt;
+
+    @Column(name = "reversed_at")
+    private Instant reversedAt;
 
     protected WalletTransaction() {
     }
@@ -61,7 +75,9 @@ public class WalletTransaction {
             BigDecimal quantity,
             BigDecimal unitPrice,
             BigDecimal fee,
-            BigDecimal totalAmount) {
+            BigDecimal totalAmount,
+            BigDecimal realizedProfit,
+            Instant executedAt) {
         this.walletId = walletId;
         this.asset = asset;
         this.type = type;
@@ -69,18 +85,50 @@ public class WalletTransaction {
         this.unitPrice = unitPrice;
         this.fee = fee;
         this.totalAmount = totalAmount;
+        this.realizedProfit = realizedProfit;
         // O PostgreSQL guarda microssegundos: assim a resposta mostra o mesmo valor do extrato.
-        this.timestamp = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        this.recordedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        this.timestamp = executedAt == null ? recordedAt : executedAt.truncatedTo(ChronoUnit.MICROS);
     }
 
     public static WalletTransaction buy(
-            UUID walletId, Asset asset, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fee, BigDecimal total) {
-        return new WalletTransaction(walletId, asset, TransactionType.BUY, quantity, unitPrice, fee, total);
+            UUID walletId,
+            Asset asset,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal fee,
+            BigDecimal total,
+            Instant executedAt) {
+        return new WalletTransaction(walletId, asset, TransactionType.BUY, quantity, unitPrice, fee, total, null, executedAt);
     }
 
     public static WalletTransaction sell(
-            UUID walletId, Asset asset, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fee, BigDecimal total) {
-        return new WalletTransaction(walletId, asset, TransactionType.SELL, quantity, unitPrice, fee, total);
+            UUID walletId,
+            Asset asset,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal fee,
+            BigDecimal total,
+            BigDecimal realizedProfit,
+            Instant executedAt) {
+        return new WalletTransaction(
+                walletId, asset, TransactionType.SELL, quantity, unitPrice, fee, total, realizedProfit, executedAt);
+    }
+
+    public void markReversed() {
+        reversedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    }
+
+    public void updateRealizedProfit(BigDecimal realizedProfit) {
+        this.realizedProfit = realizedProfit;
+    }
+
+    public boolean isReversed() {
+        return reversedAt != null;
+    }
+
+    public Instant getReversedAt() {
+        return reversedAt;
     }
 
     public UUID getId() {
@@ -109,6 +157,10 @@ public class WalletTransaction {
 
     public BigDecimal getTotalAmount() {
         return totalAmount;
+    }
+
+    public BigDecimal getRealizedProfit() {
+        return realizedProfit;
     }
 
     public Instant getTimestamp() {

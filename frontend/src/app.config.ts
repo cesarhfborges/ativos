@@ -36,7 +36,15 @@ const AtivosPreset = definePreset(Aura, {
         }
     },
     components: {
-        button: { colorScheme: { light: { outlined: { secondary: { color: '{surface.700}' } }, text: { secondary: { color: '{surface.700}' } } } } },
+        button: {
+            colorScheme: {
+                light: {
+                    root: { danger: { background: '{red.700}', hoverBackground: '{red.800}', activeBackground: '{red.900}', borderColor: '{red.700}', hoverBorderColor: '{red.800}', activeBorderColor: '{red.900}' } },
+                    outlined: { secondary: { color: '{surface.700}' } },
+                    text: { secondary: { color: '{surface.700}' } }
+                }
+            }
+        },
         toast: { colorScheme: { light: SEVERITY_COLORS } },
         message: {
             colorScheme: {
@@ -60,7 +68,38 @@ export const appConfig: ApplicationConfig = {
         provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
         provideZonelessChangeDetection(),
         provideAppInitializer(() => inject(AuthService).restoreSession()),
-        providePrimeNG({ theme: { preset: AtivosPreset, options: { darkModeSelector: '.app-dark' } } }),
+        providePrimeNG({
+            theme: { preset: AtivosPreset, options: { darkModeSelector: '.app-dark' } },
+            // Só os textos fixos do calendário, que não têm outro lugar para serem definidos.
+            translation: {
+                dayNames: ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
+                dayNamesShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+                dayNamesMin: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'],
+                monthNames: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
+                monthNamesShort: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                firstDayOfWeek: 0,
+                today: 'Hoje',
+                clear: 'Limpar',
+                weekHeader: 'Sem',
+                dateFormat: 'dd/mm/yy',
+                chooseDate: 'Escolher data',
+                // Vazios: sem eles, o botão é lido pelo mês ou ano que mostra, e não por um texto fixo.
+                chooseYear: '',
+                chooseMonth: '',
+                prevDecade: 'Década anterior',
+                nextDecade: 'Próxima década',
+                prevYear: 'Ano anterior',
+                nextYear: 'Próximo ano',
+                prevMonth: 'Mês anterior',
+                nextMonth: 'Próximo mês',
+                prevHour: 'Hora anterior',
+                nextHour: 'Próxima hora',
+                prevMinute: 'Minuto anterior',
+                nextMinute: 'Próximo minuto',
+                prevSecond: 'Segundo anterior',
+                nextSecond: 'Próximo segundo'
+            }
+        }),
         MessageService,
         { provide: LOCALE_ID, useValue: 'pt-BR' }
     ]

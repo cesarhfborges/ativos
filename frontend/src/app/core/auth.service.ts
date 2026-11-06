@@ -46,6 +46,11 @@ export class AuthService {
         );
     }
 
+    /** Mantém o nome da barra superior em dia depois de editar o perfil. */
+    updateName(name: string): void {
+        this.currentUser.update((user) => (user ? { ...user, name } : user));
+    }
+
     /** Usado quando o backend avisa que a sessão expirou. */
     clearSession(): void {
         this.currentUser.set(null);

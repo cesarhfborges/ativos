@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
+/** {@code realizedProfit} só vem preenchido nas vendas; {@code reversedAt}, nas operações estornadas. */
 public record TransactionResponse(
         UUID id,
         TransactionType type,
@@ -14,7 +15,9 @@ public record TransactionResponse(
         BigDecimal unitPrice,
         BigDecimal fee,
         BigDecimal totalAmount,
-        Instant timestamp) {
+        BigDecimal realizedProfit,
+        Instant timestamp,
+        Instant reversedAt) {
 
     public static TransactionResponse from(WalletTransaction transaction) {
         return new TransactionResponse(
@@ -25,6 +28,8 @@ public record TransactionResponse(
                 transaction.getUnitPrice(),
                 transaction.getFee(),
                 transaction.getTotalAmount(),
-                transaction.getTimestamp());
+                transaction.getRealizedProfit(),
+                transaction.getTimestamp(),
+                transaction.getReversedAt());
     }
 }

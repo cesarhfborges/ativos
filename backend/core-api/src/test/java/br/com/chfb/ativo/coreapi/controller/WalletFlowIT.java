@@ -62,6 +62,10 @@ class WalletFlowIT {
         ResponseEntity<String> sale = user.sell(symbol, "1", "300", "0.50");
         assertThat(sale.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(read(sale).at("/totalAmount").decimalValue()).isEqualByComparingTo("299.50");
+        // 299,50 - (1 x 150) = 149,50
+        assertThat(read(sale).at("/realizedProfit").decimalValue()).isEqualByComparingTo("149.50");
+        assertThat(read(user.get("/api/dashboard/overview")).at("/realizedProfit").decimalValue())
+                .isEqualByComparingTo("149.50");
 
         JsonNode positions = read(user.get("/api/dashboard/positions"));
         assertThat(positions.at("/0/symbol").asText()).isEqualTo(symbol);
@@ -330,7 +334,8 @@ class WalletFlowIT {
             get("/api/auth/csrf");
             String password = "senha-forte-123";
             post("/api/auth/register", """
-                    {"name":"Ana","email":"%s","password":"%s"}""".formatted(email, password));
+                    {"name":"Ana","email":"%s","password":"%s","confirmPassword":"%s"}"""
+                    .formatted(email, password, password));
             assertThat(post("/api/auth/login", """
                     {"email":"%s","password":"%s"}""".formatted(email, password)).getStatusCode())
                     .isEqualTo(HttpStatus.OK);

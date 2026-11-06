@@ -60,6 +60,12 @@ public class WalletPosition {
         quantity = Amounts.quantity(quantity.subtract(soldQuantity));
     }
 
+    /** Assume o resultado de um recálculo feito a partir do histórico. */
+    public void replaceWith(WalletPosition recalculated) {
+        quantity = recalculated.quantity;
+        averagePrice = recalculated.averagePrice;
+    }
+
     public boolean holds(BigDecimal requestedQuantity) {
         return quantity.compareTo(requestedQuantity) >= 0;
     }

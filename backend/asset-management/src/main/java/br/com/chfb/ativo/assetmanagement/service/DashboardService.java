@@ -7,6 +7,7 @@ import br.com.chfb.ativo.assetmanagement.entity.Amounts;
 import br.com.chfb.ativo.assetmanagement.repository.PortfolioSnapshotRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletPositionRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletRepository;
+import br.com.chfb.ativo.assetmanagement.repository.WalletTransactionRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -24,16 +25,19 @@ public class DashboardService {
     private final WalletRepository walletRepository;
     private final WalletPositionRepository positionRepository;
     private final PortfolioSnapshotRepository snapshotRepository;
+    private final WalletTransactionRepository transactionRepository;
     private final PortfolioValuation valuation;
 
     public DashboardService(
             WalletRepository walletRepository,
             WalletPositionRepository positionRepository,
             PortfolioSnapshotRepository snapshotRepository,
+            WalletTransactionRepository transactionRepository,
             PortfolioValuation valuation) {
         this.walletRepository = walletRepository;
         this.positionRepository = positionRepository;
         this.snapshotRepository = snapshotRepository;
+        this.transactionRepository = transactionRepository;
         this.valuation = valuation;
     }
 
@@ -49,6 +53,9 @@ public class DashboardService {
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
+        BigDecimal realizedProfit = walletRepository.findByUserId(userId)
+                .map(wallet -> transactionRepository.sumRealizedProfit(wallet.getId()))
+                .orElse(BigDecimal.ZERO);
         int withoutQuote = (int) positions.stream().filter(position -> position.currentPrice() == null).count();
 
         return new DashboardOverviewResponse(
@@ -56,6 +63,7 @@ public class DashboardService {
                 market,
                 profitLoss,
                 PortfolioValuation.percent(profitLoss, invested),
+                realizedProfit,
                 withoutQuote,
                 quotesUpdatedAt);
     }

@@ -4,6 +4,7 @@ import { MessageService } from 'primeng/api';
 import { StyleClassModule } from 'primeng/styleclass';
 import { errorMessage } from '@/app/core/api-error';
 import { AuthService } from '@/app/core/auth.service';
+import { ConfirmService } from '@/app/core/confirm.service';
 import { LayoutService } from '@/app/layout/service/layout.service';
 
 @Component({
@@ -43,10 +44,10 @@ import { LayoutService } from '@/app/layout/service/layout.service';
 
             <div class="layout-topbar-menu hidden lg:block">
                 <div class="layout-topbar-menu-content items-center">
-                    <span class="flex items-center gap-2 px-2 text-color" [attr.title]="auth.user()?.email">
+                    <a routerLink="/perfil" class="flex items-center gap-2 px-2 text-color hover:underline" [attr.title]="auth.user()?.email">
                         <i class="pi pi-user" aria-hidden="true"></i>
                         {{ auth.user()?.name }}
-                    </span>
+                    </a>
                     <button type="button" class="layout-topbar-action" aria-label="Sair" title="Sair" [disabled]="loggingOut()" (click)="logout()">
                         <i class="pi pi-sign-out" aria-hidden="true"></i>
                         <span>Sair</span>
@@ -61,17 +62,20 @@ export class AppTopbar {
     protected readonly auth = inject(AuthService);
     private readonly router = inject(Router);
     private readonly messages = inject(MessageService);
+    private readonly confirm = inject(ConfirmService);
 
     protected readonly loggingOut = signal(false);
 
     protected logout(): void {
-        this.loggingOut.set(true);
-        this.auth.logout().subscribe({
-            next: () => void this.router.navigate(['/auth/login']),
-            error: (error: unknown) => {
-                this.loggingOut.set(false);
-                this.messages.add({ severity: 'error', closable: false, summary: 'Não foi possível sair', detail: errorMessage(error) });
-            }
+        this.confirm.ask({ header: 'Sair da conta', message: 'Deseja realmente sair? Para voltar, será preciso entrar novamente.', acceptLabel: 'Sair' }, () => {
+            this.loggingOut.set(true);
+            this.auth.logout().subscribe({
+                next: () => void this.router.navigate(['/auth/login']),
+                error: (error: unknown) => {
+                    this.loggingOut.set(false);
+                    this.messages.add({ severity: 'error', closable: false, summary: 'Não foi possível sair', detail: errorMessage(error) });
+                }
+            });
         });
     }
 }

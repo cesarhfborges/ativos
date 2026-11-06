@@ -20,7 +20,10 @@ public class OpenApiConfig {
 
     public static final String AUTH_TAG = "Autenticação";
     public static final String TRANSACTION_TAG = "Transações";
+    public static final String PROFILE_TAG = "Perfil";
+    public static final String ASSET_TAG = "Ativos";
     public static final String DASHBOARD_TAG = "Dashboard";
+    public static final String PREDICTION_TAG = "Projeções";
     public static final String SESSION_SCHEME = "session";
 
     private static final String DESCRIPTION = """

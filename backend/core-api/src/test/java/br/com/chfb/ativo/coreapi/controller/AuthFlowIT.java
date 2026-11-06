@@ -143,6 +143,11 @@ class AuthFlowIT {
         assertThat(tooShort.getBody()).contains("\"field\":\"email\"", "\"field\":\"password\"");
 
         // 40 caracteres acentuados cabem no @Size, mas ocupam 80 bytes: acima do limite do BCrypt.
+        ResponseEntity<String> mismatch = new Browser().post("/api/auth/register",
+                "{\"name\":\"Ana\",\"email\":\"%s\",\"password\":\"senha-forte-123\",\"confirmPassword\":\"outra-senha-123\"}"
+                        .formatted(uniqueEmail()));
+        assertThat(mismatch.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
         ResponseEntity<String> tooManyBytes = new Browser().post("/api/auth/register",
                 registerBody(uniqueEmail(), "ç".repeat(40)));
 
@@ -169,7 +174,8 @@ class AuthFlowIT {
     }
 
     private static String registerBody(String email, String password) {
-        return "{\"name\":\"Ana\",\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password);
+        return "{\"name\":\"Ana\",\"email\":\"%s\",\"password\":\"%s\",\"confirmPassword\":\"%s\"}"
+                .formatted(email, password, password);
     }
 
     private static String loginBody(String email, String password) {

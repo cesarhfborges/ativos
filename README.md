@@ -233,6 +233,7 @@ A coleta de hora cheia consulta só os símbolos com posição aberta, grava a �
 | `GET /api/dashboard/positions` | Posições com preço médio, cotação e lucro ou prejuízo; sem cotação, valem pelo preço médio |
 | `GET /api/dashboard/history?days=30` | Pontos do histórico patrimonial, de 1 a 365 dias |
 | `GET /api/dashboard/market?days=30` | Por posição aberta: variação em 24 horas e no período, mínima, máxima e preços, de 1 a 365 dias |
+| `GET /api/dashboard/sentiment?days=30` | Índice de ganância e medo da carteira: leitura atual, componentes e pontos diários, de 1 a 365 dias |
 
 Para adicionar um provedor, implemente `CryptoMarketProvider` ou `StockMarketProvider` com `@ConditionalOnProperty` e aponte `market.provider.*` para ele.
 
@@ -297,14 +298,43 @@ O Painel mostra um gráfico de radar com seis notas de 0 a 100, sempre com 100 n
 
 | Aspecto | Como é medido | Escala |
 | --- | --- | --- |
-| Diversificação | Número efetivo de ativos, o inverso da soma dos pesos ao quadrado | 1 ativo é 0; 10 de mesmo peso é 100 |
+| Diversificação | Quanto da concentração a divisão elimina: (1 − soma dos pesos ao quadrado) ÷ 0,9 | 1 ativo é 0; 2 de mesmo peso é 56; 5 é 89; 10 é 100 |
 | Rentabilidade | Lucro ou prejuízo sobre o custo, das posições com cotação | -50% é 0; zero é 50; +50% é 100 |
-| Momento | Variação de preços no período escolhido, ponderada pelo valor | -20% é 0; zero é 50; +20% é 100 |
+| Momento | Variação de preços no período escolhido, ponderada pelo valor, só com ativos que têm preços de quase todo o período | Zero é 50; os extremos são ±20% em 30 dias e crescem com a raiz do tempo: ±10% em 7 dias, ±35% em 90 e ±70% em 1 ano |
 | Estabilidade | Volatilidade anualizada no período, média ponderada pelo valor de cada ativo | 0% é 100; 100% ao ano ou mais é 0 |
 | Posições no lucro | Parte das posições com cotação acima do custo | Percentual direto |
 | Plano de saída | Parte das posições com alvo de venda ou stop no Acompanhamento | Percentual direto |
 
-A estabilidade é uma aproximação: a média ignora a correlação entre os ativos e, em 7 dias, as ações parecem mais estáveis porque o preço não muda fora do pregão.
+Um ativo tem histórico curto quando falta mais que 10% do período ou 5 dias, o que for maior. Ele fica fora do momento, e o momento fica sem nota se os ativos medidos somarem menos de 50% do valor da carteira. Isso evita somar, em "1 ano", um ano de uma moeda com os 3 meses de histórico de uma ação. Nas demais telas de mercado, a variação continua aparecendo, com o período real ao lado, como "em 88 dias".
+
+A diversificação olha só os pesos: 10 criptomoedas de mesmo peso também valem 100, embora costumem cair juntas. A estabilidade é uma aproximação: a média ignora a correlação entre os ativos e, em 7 dias, usa poucos pontos, então a nota oscila mais.
+
+## Ganância e medo
+
+O Painel mostra um índice de 0 (medo extremo) a 100 (ganância extrema), com um medidor da leitura atual e a curva do período, em vermelho (medo), azul (neutro) e verde (ganância). Ele usa só os fechamentos gravados e nunca chama os provedores. Sem volume, opções ou redes sociais, descreve o comportamento dos preços, não o humor do mercado; não prevê o futuro e não é recomendação de investimento.
+
+| Componente (25% cada) | Cálculo | Nota |
+| --- | --- | --- |
+| Força das altas | RSI de 14 dias, de Wilder | Valor direto |
+| Distância da média | Distância até a média de 50 fechamentos ÷ (volatilidade diária de 50 × 5) | -2 é 0; +2 é 100 |
+| Posição na faixa | Onde o preço está entre a mínima e a máxima de 50 fechamentos | Percentual direto |
+| Calmaria | Volatilidade de 20 fechamentos ÷ volatilidade de 50 | O dobro é 0; igual é 50; a metade é 100 |
+
+| Faixa | Leitura |
+| --- | --- |
+| 0–24 | Medo extremo |
+| 25–44 | Medo |
+| 45–55 | Neutro |
+| 56–75 | Ganância |
+| 76–100 | Ganância extrema |
+
+- **Quando é calculado:** por símbolo, igual para todos, ao fim de cada coleta agendada, em `market_sentiment_daily`. Refaz o último dia calculado e os seguintes. A tabela é derivada: pode ser apagada e é refeita na coleta seguinte. A coleta pelo admin, a do início da aplicação e a de um símbolo novo não atualizam o índice, então um símbolo novo entra na próxima coleta agendada.
+- **Por que não na compra e venda:** a operação não muda preços, a data pode ser retroativa e um símbolo novo ainda não tem histórico. Os pesos são aplicados só na leitura, com o valor atual de cada posição, então compras, vendas e estornos valem na hora, sem nada para corrigir, e a curva inteira é redesenhada: ela mostra os ativos de hoje no passado.
+- **Dados insuficientes:** a nota de um símbolo exige 51 fechamentos diferentes em 200 dias. Quem não tem nota sai da média, e a resposta informa a parte coberta em `coverage`. Dias com menos de 50% de cobertura ficam de fora. Ações fora da lista de teste da Brapi precisam de `BRAPI_TOKEN`.
+- **Dias sem pregão:** a última nota de um ativo é repetida por até 5 dias, para a curva não saltar nos fins de semana. A linha nunca passa da última nota real; com ela mais antiga que isso, `stale` vem verdadeiro e o card avisa.
+- **O dia** segue o fuso de São Paulo.
+- **Limite conhecido:** força das altas, distância da média e posição na faixa se movem juntas (correlação perto de 0,9 em BTC, ETH, PETR4 e VALE3), então o índice pesa mais a tendência recente. Os pesos e limites são um ponto de partida.
+- **Módulo desligado:** com `PREDICTIVE_ENABLED=false`, o endpoint deixa de existir e o card não aparece.
 
 ## Busca de ativos
 

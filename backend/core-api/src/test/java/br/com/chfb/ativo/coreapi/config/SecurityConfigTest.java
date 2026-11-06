@@ -13,6 +13,7 @@ import br.com.chfb.ativo.assetmanagement.service.WalletService;
 import br.com.chfb.ativo.assetmanagement.service.WatchlistService;
 import br.com.chfb.ativo.markettracker.service.SyncLog;
 import br.com.chfb.ativo.sharedkernel.market.AssetSearch;
+import br.com.chfb.ativo.predictiveengine.service.PortfolioSentimentService;
 import br.com.chfb.ativo.predictiveengine.service.PredictionService;
 import br.com.chfb.ativo.coreapi.service.AuthService;
 import br.com.chfb.ativo.coreapi.service.ProfileService;
@@ -56,6 +57,9 @@ class SecurityConfigTest {
 
     @MockitoBean
     private PredictionService predictionService;
+
+    @MockitoBean
+    private PortfolioSentimentService portfolioSentimentService;
 
     @MockitoBean
     private ProfileService profileService;

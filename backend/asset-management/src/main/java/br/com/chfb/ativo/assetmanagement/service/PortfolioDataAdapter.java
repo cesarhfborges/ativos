@@ -27,11 +27,16 @@ public class PortfolioDataAdapter implements PortfolioDataProvider {
     @Override
     @Transactional(readOnly = true)
     public PortfolioData load(UUID userId) {
-        List<AssetExposure> exposures =
-                dashboardService.positions(userId).stream().map(PortfolioDataAdapter::toExposure).toList();
+        List<AssetExposure> exposures = exposures(userId);
         List<PortfolioSample> history =
                 dashboardService.history(userId, HISTORY_DAYS).stream().map(PortfolioDataAdapter::toSample).toList();
         return new PortfolioData(exposures, history);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AssetExposure> exposures(UUID userId) {
+        return dashboardService.positions(userId).stream().map(PortfolioDataAdapter::toExposure).toList();
     }
 
     private static AssetExposure toExposure(DashboardPositionResponse position) {

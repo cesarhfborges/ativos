@@ -56,6 +56,7 @@ class TechnicalSignalsDisabledIT {
         JsonNode list = new ObjectMapper().readTree(exchange("/api/watchlist", HttpMethod.GET, null).getBody());
         assertThat(list.at("/0/symbol").asText()).isEqualTo("OFF1");
         assertThat(list.at("/0/signal").isNull()).isTrue();
+        assertThat(exchange("/api/dashboard/sentiment", HttpMethod.GET, null).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     private ResponseEntity<String> exchange(String path, HttpMethod method, String body) {

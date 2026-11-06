@@ -17,16 +17,16 @@ const COLORS: Record<'light' | 'dark', Record<AllocationKey, string>> = {
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Alocação da carteira</h2>
         <p class="text-muted-color mt-0! mb-6!">Criptomoedas e ações, a valor de mercado.</p>
 
-        <div class="flex flex-col md:flex-row md:items-center gap-8">
+        <div class="flex flex-col items-center gap-6">
             @if (hasData()) {
-                <div class="w-56 max-w-full mx-auto md:mx-0 shrink-0">
+                <div class="w-44 max-w-full shrink-0">
                     <p-chart type="doughnut" [data]="chartData()" [options]="chartOptions" [ariaLabel]="description()" />
                 </div>
             } @else {
-                <p class="text-muted-color m-0! md:w-56 shrink-0">Sua carteira ainda está vazia. Registre uma compra para ver a distribuição.</p>
+                <p class="text-muted-color m-0! w-full">Sua carteira ainda está vazia. Registre uma compra para ver a distribuição.</p>
             }
 
-            <table class="w-full max-w-lg">
+            <table class="w-full">
                 <caption class="sr-only">
                     Distribuição do patrimônio por categoria
                 </caption>

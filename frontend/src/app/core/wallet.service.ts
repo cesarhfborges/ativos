@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Asset, BuyRequest, DashboardOverview, DashboardPosition, PortfolioHistoryPoint, SellRequest, Transaction, TransactionType } from './api.models';
+import { Asset, BuyRequest, DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, SellRequest, Transaction, TransactionType } from './api.models';
 
 @Injectable({ providedIn: 'root' })
 export class WalletService {
@@ -21,6 +21,10 @@ export class WalletService {
 
     history(days: number): Observable<PortfolioHistoryPoint[]> {
         return this.http.get<PortfolioHistoryPoint[]>('/api/dashboard/history', { params: { days } });
+    }
+
+    market(days: number): Observable<MarketAsset[]> {
+        return this.http.get<MarketAsset[]>('/api/dashboard/market', { params: { days } });
     }
 
     /** `refreshed` é falso quando já houve uma coleta no último minuto. */

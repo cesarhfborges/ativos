@@ -4,10 +4,12 @@ import br.com.chfb.ativo.markettracker.provider.CryptoMarketProvider;
 import br.com.chfb.ativo.markettracker.provider.StockMarketProvider;
 import br.com.chfb.ativo.sharedkernel.market.ActiveSymbols;
 import br.com.chfb.ativo.sharedkernel.market.ActiveSymbolsProvider;
+import br.com.chfb.ativo.sharedkernel.market.PricePoint;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -23,6 +25,11 @@ public class QuoteCollector {
     private static final Logger log = LoggerFactory.getLogger(QuoteCollector.class);
     /** Limita as atualizações pedidas pelos usuários, que consomem a cota das APIs externas. */
     private static final Duration MANUAL_REFRESH_INTERVAL = Duration.ofMinutes(1);
+    /**
+     * Quem não tem preço mais antigo que isso recebe a carga inicial. Se ela falhar, é refeita nas próximas coletas,
+     * até a própria coleta alcançar essa idade; um símbolo que o provedor nunca cota continua sendo tentado.
+     */
+    private static final Duration BACKFILL_AGE = Duration.ofDays(1);
 
     private final ActiveSymbolsProvider activeSymbolsProvider;
     private final Optional<CryptoMarketProvider> cryptoProvider;
@@ -54,6 +61,8 @@ public class QuoteCollector {
                 "Coleta de cotações: {} de {} símbolos atualizados",
                 prices.size(),
                 active.crypto().size() + active.stocks().size());
+        backfill("cripto", active.crypto(), cryptoProvider.map(p -> p::fetchCryptoDailyCloses));
+        backfill("ações", active.stocks(), stockProvider.map(p -> p::fetchStockDailyCloses));
         return lastCollectedAt;
     }
 
@@ -64,6 +73,25 @@ public class QuoteCollector {
         }
         collect();
         return true;
+    }
+
+    private void backfill(String group, Set<String> symbols, Optional<Function<String, List<PricePoint>>> fetcher) {
+        if (fetcher.isEmpty()) {
+            return;
+        }
+        Set<String> covered = quoteStore.symbolsWithHistoryUntil(symbols, lastCollectedAt.minus(BACKFILL_AGE));
+        for (String symbol : symbols) {
+            if (covered.contains(symbol)) {
+                continue;
+            }
+            try {
+                List<PricePoint> closes = fetcher.get().apply(symbol);
+                quoteStore.saveHistory(symbol, closes);
+                log.info("Histórico de {} ({}): {} fechamentos diários", symbol, group, closes.size());
+            } catch (RuntimeException e) {
+                log.warn("Falha ao buscar o histórico de {} ({}): {}", symbol, group, e.getMessage());
+            }
+        }
     }
 
     private Map<String, BigDecimal> fetch(

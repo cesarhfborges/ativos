@@ -2,8 +2,10 @@ package br.com.chfb.ativo.coreapi.controller;
 
 import br.com.chfb.ativo.assetmanagement.dto.DashboardOverviewResponse;
 import br.com.chfb.ativo.assetmanagement.dto.DashboardPositionResponse;
+import br.com.chfb.ativo.assetmanagement.dto.MarketAssetResponse;
 import br.com.chfb.ativo.assetmanagement.dto.PortfolioHistoryPoint;
 import br.com.chfb.ativo.assetmanagement.service.DashboardService;
+import br.com.chfb.ativo.assetmanagement.service.MarketOverviewService;
 import br.com.chfb.ativo.coreapi.config.OpenApiConfig;
 import br.com.chfb.ativo.coreapi.dto.QuoteRefreshResponse;
 import br.com.chfb.ativo.coreapi.security.AuthenticatedUser;
@@ -31,10 +33,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class DashboardController {
 
     private final DashboardService dashboardService;
+    private final MarketOverviewService marketOverviewService;
     private final QuoteCollector quoteCollector;
 
-    public DashboardController(DashboardService dashboardService, QuoteCollector quoteCollector) {
+    public DashboardController(
+            DashboardService dashboardService,
+            MarketOverviewService marketOverviewService,
+            QuoteCollector quoteCollector) {
         this.dashboardService = dashboardService;
+        this.marketOverviewService = marketOverviewService;
         this.quoteCollector = quoteCollector;
     }
 
@@ -65,6 +72,17 @@ public class DashboardController {
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days) {
         return dashboardService.history(user.getId(), days);
+    }
+
+    @Operation(summary = "Retorna o comportamento de mercado dos ativos em carteira: variação, faixa e preços do período")
+    @ApiResponse(responseCode = "200", description = "Um item por posição aberta")
+    @ApiResponse(responseCode = "400", description = "Período inválido", content = @Content)
+    @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada", content = @Content)
+    @GetMapping("/market")
+    public List<MarketAssetResponse> market(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days) {
+        return marketOverviewService.overview(user.getId(), days);
     }
 
     @Operation(

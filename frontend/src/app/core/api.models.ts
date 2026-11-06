@@ -79,6 +79,22 @@ export interface PortfolioHistoryPoint {
     totalBalance: number;
 }
 
+/** Comportamento de mercado de um ativo em carteira. Campos ficam nulos sem preços suficientes para calculá-los. */
+export interface MarketAsset {
+    symbol: string;
+    change24hPercent: number | null;
+    periodChangePercent: number | null;
+    periodLow: number | null;
+    periodHigh: number | null;
+    /** Do mais antigo ao mais recente. */
+    prices: PricePoint[];
+}
+
+export interface PricePoint {
+    time: string;
+    price: number;
+}
+
 export interface Transaction {
     id: string;
     type: TransactionType;

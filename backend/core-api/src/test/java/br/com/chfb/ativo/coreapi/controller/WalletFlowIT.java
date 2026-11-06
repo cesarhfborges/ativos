@@ -124,6 +124,32 @@ class WalletFlowIT {
     }
 
     @Test
+    void mercadoMostraVariacaoEFaixaDosAtivosEmCarteira() throws Exception {
+        LoggedUser user = new LoggedUser();
+        String symbol = uniqueSymbol();
+        user.buy(symbol, "1", "100", "0");
+        jdbcTemplate.update(
+                "INSERT INTO market_quotes (id, symbol, price, last_updated_at) VALUES (?, ?, 110, now())",
+                UUID.randomUUID(),
+                symbol);
+        String history = "INSERT INTO market_quote_history (symbol, quoted_at, price) VALUES (?, now() - ?::interval, ?)";
+        jdbcTemplate.update(history, symbol, "40 days", 500);
+        jdbcTemplate.update(history, symbol, "20 days", 100);
+        jdbcTemplate.update(history, symbol, "10 days", 80);
+        jdbcTemplate.update(history, symbol, "2 days", 88);
+
+        JsonNode market = read(user.get("/api/dashboard/market?days=30"));
+
+        assertThat(market).hasSize(1);
+        assertThat(market.at("/0/symbol").asText()).isEqualTo(symbol);
+        assertThat(market.at("/0/periodChangePercent").decimalValue()).isEqualByComparingTo("10");
+        assertThat(market.at("/0/change24hPercent").decimalValue()).isEqualByComparingTo("25");
+        assertThat(market.at("/0/periodLow").decimalValue()).isEqualByComparingTo("80");
+        assertThat(market.at("/0/periodHigh").decimalValue()).isEqualByComparingTo("110");
+        assertThat(market.at("/0/prices")).hasSize(4);
+    }
+
+    @Test
     void contaSemOperacoesTemPainelEHistoricoVaziosSemCriarCarteira() throws Exception {
         LoggedUser user = new LoggedUser();
 

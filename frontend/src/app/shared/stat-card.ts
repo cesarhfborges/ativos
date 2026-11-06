@@ -8,7 +8,7 @@ import { Component, input } from '@angular/core';
         <div class="flex justify-between gap-4 mb-4">
             <div>
                 <div class="text-muted-color font-medium mb-4">{{ label() }}</div>
-                <div class="text-surface-900 dark:text-surface-0 font-medium text-2xl">{{ value() | currency: 'BRL' : 'symbol' : '1.2-4' }}</div>
+                <div class="text-surface-900 dark:text-surface-0 font-medium text-2xl">{{ value() | currency: 'BRL' : 'symbol' : '1.2-2' }}</div>
             </div>
             <div class="flex items-center justify-center shrink-0 bg-primary-100 dark:bg-primary-400/10 rounded-border w-10 h-10">
                 <i class="text-primary text-xl! {{ icon() }}" aria-hidden="true"></i>

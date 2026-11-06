@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.chfb.ativo.assetmanagement.service.DashboardService;
+import br.com.chfb.ativo.assetmanagement.service.MarketOverviewService;
 import br.com.chfb.ativo.assetmanagement.service.WalletService;
 import br.com.chfb.ativo.markettracker.service.QuoteCollector;
 import br.com.chfb.ativo.predictiveengine.service.PredictionService;
@@ -36,6 +37,9 @@ class SecurityConfigTest {
 
     @MockitoBean
     private DashboardService dashboardService;
+
+    @MockitoBean
+    private MarketOverviewService marketOverviewService;
 
     @MockitoBean
     private QuoteCollector quoteCollector;

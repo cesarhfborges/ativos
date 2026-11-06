@@ -9,13 +9,15 @@ import { Component, computed, input } from '@angular/core';
     template: `<span class="font-medium whitespace-nowrap" [class]="colorClass()">
         <i class="text-sm! mr-1 {{ icon() }}" aria-hidden="true"></i>{{ sign() }} {{ absolute() | currency: 'BRL' : 'symbol' : '1.2-2' }}
         @if (percent() !== null) {
-            <span class="font-normal">({{ sign() }}{{ absolutePercent() | number: '1.2-2' }}%)</span>
+            <span class="font-normal" [class.block]="stacked()">({{ sign() }}{{ absolutePercent() | number: '1.2-2' }}%)</span>
         }
     </span>`
 })
 export class ProfitLoss {
     readonly value = input.required<number>();
     readonly percent = input<number | null>(null);
+    /** Percentual em uma segunda linha, para colunas estreitas. */
+    readonly stacked = input(false);
 
     protected readonly absolute = computed(() => Math.abs(this.value()));
     protected readonly absolutePercent = computed(() => Math.abs(this.percent() ?? 0));

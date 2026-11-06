@@ -187,13 +187,14 @@ curl -b cookies.txt $API/me
 
 ## Cotações e dashboard
 
-A coleta de hora cheia consulta só os símbolos com posição aberta, grava a última cotação em `market_quotes` e gera um ponto em `portfolio_snapshots` para cada carteira. Se um provedor falhar, o símbolo mantém a última cotação conhecida e o log registra um aviso. Cripto é cotada em BRL pelo par da Binance, como `BTCBRL`.
+A coleta de hora cheia consulta só os símbolos com posição aberta, grava a última cotação em `market_quotes`, acrescenta o preço em `market_quote_history` e gera um ponto em `portfolio_snapshots` para cada carteira. Quando um símbolo ainda não tem histórico, a coleta também busca no provedor os fechamentos diários do último ano, para os gráficos de mercado já nascerem com dados; ações fora da lista de teste da Brapi precisam de `BRAPI_TOKEN`, e um plano gratuito pode limitar a carga a três meses. Se um provedor falhar, o símbolo mantém a última cotação conhecida e o log registra um aviso. Cripto é cotada em BRL pelo par da Binance, como `BTCBRL`.
 
 | Endpoint | Descrição |
 | --- | --- |
 | `GET /api/dashboard/overview` | Valor investido, valor a mercado e retorno |
 | `GET /api/dashboard/positions` | Posições com preço médio, cotação e lucro ou prejuízo; sem cotação, valem pelo preço médio |
 | `GET /api/dashboard/history?days=30` | Pontos do histórico patrimonial, de 1 a 365 dias |
+| `GET /api/dashboard/market?days=30` | Por posição aberta: variação em 24 horas e no período, mínima, máxima e preços, de 1 a 365 dias |
 | `POST /api/dashboard/refresh-quotes` | Atualiza as cotações agora, uma vez por minuto no máximo, sem gerar snapshot |
 
 Para adicionar um provedor, implemente `CryptoMarketProvider` ou `StockMarketProvider` com `@ConditionalOnProperty` e aponte `market.provider.*` para ele.

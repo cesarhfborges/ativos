@@ -20,6 +20,7 @@ const item = (overrides: Partial<WatchlistItem> = {}): WatchlistItem => ({
     quantity: 0,
     averagePrice: null,
     createdAt: '2026-11-06T00:00:00Z',
+    signal: null,
     ...overrides
 });
 

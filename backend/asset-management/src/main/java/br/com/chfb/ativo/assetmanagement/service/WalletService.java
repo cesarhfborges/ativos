@@ -21,10 +21,13 @@ import br.com.chfb.ativo.assetmanagement.repository.StatementQuery;
 import br.com.chfb.ativo.assetmanagement.repository.WalletPositionRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletTransactionRepository;
+import br.com.chfb.ativo.sharedkernel.market.Quote;
+import br.com.chfb.ativo.sharedkernel.market.QuoteLookup;
 import br.com.chfb.ativo.sharedkernel.market.SymbolTrackedEvent;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +51,7 @@ public class WalletService {
     private final WalletTransactionRepository transactionRepository;
     private final StatementQuery statementQuery;
     private final AssetRegistrar assetRegistrar;
+    private final QuoteLookup quoteLookup;
     private final TransactionTemplate transactions;
     private final ApplicationEventPublisher events;
 
@@ -58,11 +62,13 @@ public class WalletService {
             WalletTransactionRepository transactionRepository,
             StatementQuery statementQuery,
             AssetRegistrar assetRegistrar,
+            QuoteLookup quoteLookup,
             PlatformTransactionManager transactionManager,
             ApplicationEventPublisher events) {
         this.events = events;
         this.statementQuery = statementQuery;
         this.assetRegistrar = assetRegistrar;
+        this.quoteLookup = quoteLookup;
         this.transactions = new TransactionTemplate(transactionManager);
         this.walletRepository = walletRepository;
         this.assetRepository = assetRepository;
@@ -85,8 +91,14 @@ public class WalletService {
     @Transactional(readOnly = true)
     public List<AssetResponse> searchAssets(String query) {
         String term = query.strip().toUpperCase(Locale.ROOT).replaceAll("([!%_])", "!$1");
-        return assetRepository.search(term + "%", "%" + term + "%", PageRequest.of(0, ASSET_SEARCH_LIMIT)).stream()
-                .map(AssetResponse::from)
+        List<Asset> assets = assetRepository.search(term + "%", "%" + term + "%", PageRequest.of(0, ASSET_SEARCH_LIMIT));
+        // Só o que já está gravado: digitar um símbolo não pode gastar a cota das APIs externas.
+        Map<String, Quote> quotes = quoteLookup.findBySymbols(assets.stream().map(Asset::getSymbol).toList());
+        return assets.stream()
+                .map(asset -> {
+                    Quote quote = quotes.get(asset.getSymbol());
+                    return AssetResponse.from(asset, quote == null ? null : quote.price());
+                })
                 .toList();
     }
 

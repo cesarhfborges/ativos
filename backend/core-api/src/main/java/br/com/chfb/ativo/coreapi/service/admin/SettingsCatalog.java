@@ -19,6 +19,7 @@ final class SettingsCatalog {
     private static final String REFERENCE = "Premissas de referência";
     private static final String SCENARIOS = "Cenários";
     private static final String RISK = "Limites de risco";
+    private static final String SIGNAL = "Sinal técnico";
 
     static final List<Definition> ALL = List.of(
             bool(SettingKeys.REGISTRATION_ENABLED, ACCESS, "Cadastro público", "Permite criar conta pela tela de registro. O admin sempre pode criar contas."),
@@ -38,7 +39,9 @@ final class SettingsCatalog {
             percent(SettingKeys.CRYPTO_STRESS, SCENARIOS, "Queda imediata em cripto", "Aplicada no cenário pessimista, se houver cripto na carteira.", "0", "1"),
             percent(SettingKeys.STOCK_STRESS, SCENARIOS, "Queda imediata em ações", "Aplicada no cenário pessimista, se não houver cripto na carteira.", "0", "1"),
             percent(SettingKeys.MAX_CRYPTO_SHARE, RISK, "Exposição máxima a cripto", "Acima disso, a tela de projeções mostra um alerta.", "0", "1"),
-            percent(SettingKeys.MAX_ASSET_SHARE, RISK, "Concentração máxima em um ativo", "Acima disso, a tela de projeções mostra um alerta.", "0", "1"));
+            percent(SettingKeys.MAX_ASSET_SHARE, RISK, "Concentração máxima em um ativo", "Acima disso, a tela de projeções mostra um alerta.", "0", "1"),
+            integer(SettingKeys.SIGNAL_OVERSOLD, SIGNAL, "RSI sobrevendido", "Com o RSI neste valor ou abaixo, o ativo aparece como sobrevendido no Acompanhamento.", 5, 45),
+            integer(SettingKeys.SIGNAL_OVERBOUGHT, SIGNAL, "RSI sobrecomprado", "Com o RSI neste valor ou acima, o ativo aparece como sobrecomprado no Acompanhamento.", 55, 95));
 
     private SettingsCatalog() {
     }

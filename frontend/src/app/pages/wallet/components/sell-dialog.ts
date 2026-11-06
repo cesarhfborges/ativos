@@ -16,6 +16,7 @@ import { DecimalPaste } from '@/app/core/decimal-paste';
 import { ConfirmService } from '@/app/core/confirm.service';
 import { DatePickerLabels } from '@/app/core/date-picker-labels';
 import { dateClause, toInstant } from '@/app/core/operation-date';
+import { canSuggestPrice, isSuggestedPrice, PriceSuggestion, suggestionFor } from '@/app/core/price-suggestion';
 import { WalletService } from '@/app/core/wallet.service';
 
 type ControlName = 'symbol' | 'quantity' | 'unitPrice' | 'fee' | 'executedAt';
@@ -60,6 +61,17 @@ type ControlName = 'symbol' | 'quantity' | 'unitPrice' | 'fee' | 'executedAt';
                 </div>
             }
 
+            <!-- O preço vem primeiro: é a partir dele que se informa a quantidade. -->
+            <div class="flex flex-col gap-2">
+                <label for="sell-price" class="font-medium">Preço unitário</label>
+                <p-inputnumber appDecimalPaste inputId="sell-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('unitPrice')" />
+                @if (error('unitPrice'); as message) {
+                    <p-message severity="error" size="small" variant="simple" [text]="message" />
+                }
+                @if (priceFromQuote()) {
+                    <small class="text-muted-color">{{ backdated() ? 'Esta é a última cotação, de agora. Informe o preço da data da operação.' : 'Última cotação do sistema. Ajuste se você vendeu por outro preço.' }}</small>
+                }
+            </div>
             <div class="flex flex-col gap-2">
                 <div class="flex items-center justify-between gap-2">
                     <label for="sell-quantity" class="font-medium">Quantidade</label>
@@ -71,21 +83,12 @@ type ControlName = 'symbol' | 'quantity' | 'unitPrice' | 'fee' | 'executedAt';
                     <p-message severity="error" size="small" variant="simple" [text]="message" />
                 }
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="flex flex-col gap-2">
-                    <label for="sell-price" class="font-medium">Preço unitário</label>
-                    <p-inputnumber appDecimalPaste inputId="sell-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('unitPrice')" />
-                    @if (error('unitPrice'); as message) {
-                        <p-message severity="error" size="small" variant="simple" [text]="message" />
-                    }
-                </div>
-                <div class="flex flex-col gap-2">
-                    <label for="sell-fee" class="font-medium">Taxa <span class="text-muted-color font-normal">(opcional)</span></label>
-                    <p-inputnumber appDecimalPaste inputId="sell-fee" formControlName="fee" mode="currency" currency="BRL" locale="pt-BR" [min]="0" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('fee')" />
-                    @if (error('fee'); as message) {
-                        <p-message severity="error" size="small" variant="simple" [text]="message" />
-                    }
-                </div>
+            <div class="flex flex-col gap-2">
+                <label for="sell-fee" class="font-medium">Taxa <span class="text-muted-color font-normal">(opcional)</span></label>
+                <p-inputnumber appDecimalPaste inputId="sell-fee" formControlName="fee" mode="currency" currency="BRL" locale="pt-BR" [min]="0" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('fee')" />
+                @if (error('fee'); as message) {
+                    <p-message severity="error" size="small" variant="simple" [text]="message" />
+                }
             </div>
 
             <div class="flex flex-col gap-2">
@@ -159,6 +162,13 @@ export class SellDialog {
 
     protected readonly submitting = signal(false);
     protected readonly failure = signal<string | null>(null);
+    private readonly quote = signal<PriceSuggestion | null>(null);
+
+    protected readonly priceFromQuote = computed(() => {
+        this.formEvents();
+        const { symbol, unitPrice } = this.form.getRawValue();
+        return isSuggestedPrice(unitPrice, symbol, this.quote());
+    });
 
     /** A posição do ativo escolhido, que limita a quantidade e dá o preço médio da prévia. */
     protected readonly holding = computed(() => {
@@ -217,6 +227,7 @@ export class SellDialog {
     protected onSymbolChange(): void {
         this.applyCustodyLimit();
         this.form.controls.quantity.updateValueAndValidity();
+        this.suggestPrice(this.holding());
     }
 
     protected submit(): void {
@@ -256,9 +267,23 @@ export class SellDialog {
     private reset(position: Position | null): void {
         this.today = new Date();
         this.form.reset({ symbol: position?.symbol ?? null, quantity: null, unitPrice: null, fee: null, executedAt: null });
+        this.quote.set(null);
+        this.suggestPrice(position);
         this.applyCustodyLimit();
         this.failure.set(null);
         this.submitting.set(false);
+    }
+
+    /** Sem cotação para o ativo escolhido, a sugestão do anterior sai: ela pareceria o preço deste. */
+    private suggestPrice(position: Position | null): void {
+        const { unitPrice } = this.form.controls;
+        const previous = this.quote();
+        if (!canSuggestPrice(unitPrice.value, previous)) {
+            return;
+        }
+        const suggestion = position ? suggestionFor(position.symbol, position.currentPrice) : null;
+        this.quote.set(suggestion);
+        unitPrice.setValue(suggestion?.price ?? null);
     }
 
     /** Com data informada, quem confere é o backend: o limite é o que havia naquela data, não o de hoje. */

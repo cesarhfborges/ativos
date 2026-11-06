@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -176,6 +177,95 @@ class WatchlistFlowIT {
     }
 
     @Test
+    void sinalTecnicoEIgualParaTodosESaiDoHistoricoSemChamarOProvedor() throws Exception {
+        String symbol = uniqueSymbol();
+        Instant now = Instant.now();
+        for (int day = 1; day <= 60; day++) {
+            jdbc.update(
+                    "INSERT INTO market_quote_history (symbol, quoted_at, price) VALUES (?, ?, ?)",
+                    symbol,
+                    Timestamp.from(now.minus(Duration.ofDays(day))),
+                    BigDecimal.valueOf(1000 - day));
+        }
+        withCurrentQuote(symbol, 1000);
+        Session first = new Session();
+        Session second = new Session();
+        first.add(symbol, "");
+        second.add(symbol, "");
+        Mockito.clearInvocations(crypto);
+
+        JsonNode signal = JSON.readTree(first.get("/api/watchlist?days=1").getBody()).at("/0/signal");
+        JsonNode other = JSON.readTree(second.get("/api/watchlist?days=30").getBody()).at("/0/signal");
+
+        assertThat(signal.at("/available").asBoolean()).isTrue();
+        assertThat(signal.at("/rsi").decimalValue()).isEqualByComparingTo("100");
+        assertThat(signal.at("/momentum").asText()).isEqualTo("OVERBOUGHT");
+        assertThat(signal.at("/trend").asText()).isEqualTo("UP");
+        assertThat(other).isEqualTo(signal);
+        Mockito.verifyNoInteractions(crypto, stock);
+    }
+
+    @Test
+    void osLimitesDoAdminValemNaHoraParaOSinal() throws Exception {
+        String symbol = uniqueSymbol();
+        Instant now = Instant.now();
+        for (int day = 1; day <= 60; day++) {
+            // Sobe e desce o mesmo tanto: o RSI fica perto do meio da escala.
+            jdbc.update(
+                    "INSERT INTO market_quote_history (symbol, quoted_at, price) VALUES (?, ?, ?)",
+                    symbol,
+                    Timestamp.from(now.minus(Duration.ofDays(day))),
+                    BigDecimal.valueOf(day % 2 == 0 ? 100 : 101));
+        }
+        withCurrentQuote(symbol, 100);
+        Session user = new Session();
+        user.add(symbol, "");
+        assertThat(JSON.readTree(user.get("/api/watchlist").getBody()).at("/0/signal/momentum").asText()).isEqualTo("NEUTRAL");
+
+        jdbc.update(
+                """
+                INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('predictive.signal.overbought', '40', now(), 'teste')
+                ON CONFLICT (key) DO UPDATE SET value = '40'
+                """);
+        try {
+            JsonNode signal = JSON.readTree(user.get("/api/watchlist").getBody()).at("/0/signal");
+            assertThat(signal.at("/momentum").asText()).isEqualTo("OVERBOUGHT");
+            assertThat(signal.at("/overboughtLimit").asInt()).isEqualTo(40);
+        } finally {
+            jdbc.update("DELETE FROM app_settings WHERE key = 'predictive.signal.overbought'");
+        }
+    }
+
+    @Test
+    void semHistoricoOSinalFicaIndisponivel() throws Exception {
+        Session user = new Session();
+
+        JsonNode signal = JSON.readTree(user.add(uniqueSymbol(), "").getBody()).at("/signal");
+
+        assertThat(signal.at("/available").asBoolean()).isFalse();
+        assertThat(signal.at("/requiredCloses").asInt()).isEqualTo(50);
+    }
+
+    @Test
+    void buscaNoCatalogoTrazACotacaoGravadaSemChamarOProvedor() throws Exception {
+        String quoted = uniqueSymbol();
+        String withoutQuote = uniqueSymbol();
+        Session user = new Session();
+        user.add(quoted, "");
+        user.add(withoutQuote, "");
+        jdbc.update("DELETE FROM market_quotes WHERE symbol IN (?, ?)", quoted, withoutQuote);
+        withCurrentQuote(quoted, 123);
+        Mockito.clearInvocations(crypto, stock);
+
+        JsonNode found = JSON.readTree(user.get("/api/assets?query=" + quoted).getBody()).get(0);
+        JsonNode missing = JSON.readTree(user.get("/api/assets?query=" + withoutQuote).getBody()).get(0);
+
+        assertThat(found.at("/price").decimalValue()).isEqualByComparingTo("123");
+        assertThat(missing.at("/price").isNull()).isTrue();
+        Mockito.verifyNoInteractions(crypto, stock);
+    }
+
+    @Test
     void naoAlcancaItemDeOutroUsuario() throws Exception {
         Session owner = new Session();
         Session other = new Session();
@@ -258,6 +348,15 @@ class WatchlistFlowIT {
         admin.login();
 
         assertThat(admin.exchange("/api/admin/assets/" + asset, HttpMethod.DELETE, null).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    /** Já coberto pela coleta: adicionar o ativo não busca um preço novo no provedor simulado. */
+    private void withCurrentQuote(String symbol, int price) {
+        jdbc.update(
+                "INSERT INTO market_quotes (id, symbol, price, last_updated_at) VALUES (?, ?, ?, now())",
+                UUID.randomUUID(),
+                symbol,
+                BigDecimal.valueOf(price));
     }
 
     private static String uniqueSymbol() {

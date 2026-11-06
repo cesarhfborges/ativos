@@ -264,7 +264,7 @@ A tela **Acompanhamento** lista ativos que o usuário quer observar, tendo ou n�
 
 | Endpoint | Descrição | Respostas |
 | --- | --- | --- |
-| `GET /api/watchlist?days=30` | Ativos acompanhados, com plano, dados de mercado e posição na carteira | `200` |
+| `GET /api/watchlist?days=30` | Ativos acompanhados, com plano, dados de mercado, posição na carteira e sinal técnico | `200` |
 | `POST /api/watchlist` | Passa a acompanhar. Corpo: `symbol`, `assetType` e, opcionais, `name`, `buyBelow`, `sellAbove`, `stopLoss`, `note` e `acceptUnverified` | `201`, `400`, `409`, `422` |
 | `PUT /api/watchlist/{id}` | Substitui o plano: `buyBelow`, `sellAbove`, `stopLoss` e `note` | `200`, `400`, `404`, `422` |
 | `DELETE /api/watchlist/{id}` | Deixa de acompanhar e apaga o plano | `204`, `404` |
@@ -272,6 +272,22 @@ A tela **Acompanhamento** lista ativos que o usuário quer observar, tendo ou n�
 - **Alvos:** "comprar abaixo de" é atingido com a cotação no preço ou abaixo dele; "vender acima de", no preço ou acima; o stop, no preço ou abaixo. Venda e stop só geram aviso para quem tem o ativo. Os alvos atingidos aparecem nas telas de Acompanhamento e Painel, e o plano também na Carteira, onde pode ser definido.
 - **Regras:** o alvo de venda precisa ser maior que o preço de compra e que o stop. O mesmo ativo não pode ser adicionado duas vezes. O limite é de 100 ativos por usuário, ajustável pelo admin; ele só protege a cota das APIs contra abuso, porque o custo depende dos símbolos distintos, não dos usuários.
 - **Catálogo:** um ativo acompanhado não pode ser removido pelo admin. Na primeira vez em que o sistema vê um símbolo, ele é conferido no provedor, como na compra.
+
+## Sinal técnico
+
+Cada ativo do Acompanhamento mostra uma leitura técnica, calculada por símbolo e igual para todos os usuários. O cálculo usa o histórico gravado e nunca chama os provedores. Ele descreve o histórico de preços: não prevê o futuro, não diz para comprar ou vender e não é recomendação de investimento.
+
+| Indicador | Cálculo | Leitura |
+| --- | --- | --- |
+| RSI de 14 dias | Método de Wilder sobre fechamentos diários | Até 30: sobrevendido; a partir de 70: sobrecomprado; entre eles: neutro |
+| Médias de 20 e 50 dias | Média simples dos fechamentos | Média de 20 acima da de 50: tendência de alta; abaixo: de baixa |
+
+A tela sempre mostra os dois juntos, porque um RSI baixo em tendência de baixa pode ser só um ativo que continua caindo. Os limites do RSI são ajustados pelo admin nas configurações e valem na hora; os períodos são fixos.
+
+- **Dados insuficientes:** a leitura exige 50 fechamentos e preços dos últimos 5 dias. Ações fora da lista de teste da Brapi precisam de `BRAPI_TOKEN` para ter histórico.
+- **Dias sem pregão:** a coleta grava preço todos os dias. Fechamentos repetidos ficam de fora do cálculo para fins de semana e feriados não distorcerem os indicadores.
+- **Limites dos dados:** só há preço de fechamento, sem volume nem máxima e mínima do dia. O último ponto é a cotação mais recente, então a leitura pode mudar durante o pregão.
+- **Módulo desligado:** com `PREDICTIVE_ENABLED=false`, `signal` vem nulo e a coluna não aparece.
 
 ## Perfil da carteira
 
@@ -290,7 +306,9 @@ A estabilidade é uma aproximação: a média ignora a correlação entre os ati
 
 ## Busca de ativos
 
-`GET /api/assets?query=pe` procura no catálogo de ativos já cadastrados, compartilhado entre os usuários, pelo início do símbolo ou por parte do nome. A tela de compra usa essa busca para sugerir o símbolo e preencher o tipo; símbolos novos são cadastrados na primeira compra.
+`GET /api/assets?query=pe` procura no catálogo de ativos já cadastrados, compartilhado entre os usuários, pelo início do símbolo ou por parte do nome, e devolve a última cotação gravada em `price`, sem chamar os provedores. A tela de compra usa essa busca para sugerir o símbolo e preencher o tipo e o preço; símbolos novos são cadastrados na primeira compra.
+
+Nas telas de compra e venda, o preço unitário já vem com a última cotação do sistema, que pode ser ajustada. O que o usuário digitou nunca é substituído, e numa operação com data passada a tela avisa que o valor é a cotação de agora.
 
 `GET /api/assets/lookup?query=petr&type=STOCK` procura no provedor de cotações, inclusive ativos ainda não cadastrados, e devolve nome e cotação atual. A mesma pesquisa, de qualquer usuário, é respondida do cache por 5 minutos. Em ações, usa a listagem da Brapi. Em cripto, só encontra pares negociados na Binance na moeda de cotação (BRL), os únicos que o sistema consegue cotar. Com `available: false`, o provedor não respondeu, o que não significa que o ativo não existe.
 

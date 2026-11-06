@@ -12,10 +12,12 @@ import { MessageModule } from 'primeng/message';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
 import { AssetCandidate, AssetType, Position, Transaction, WatchlistItem } from '@/app/core/api.models';
 import { errorMessage } from '@/app/core/api-error';
 import { ConfirmService } from '@/app/core/confirm.service';
 import { MARKET_PERIODS } from '@/app/core/market';
+import { signalReading } from '@/app/core/technical-signal';
 import { isHeld, reachedTargets } from '@/app/core/watchlist';
 import { WatchlistService } from '@/app/core/watchlist.service';
 import { BuyDialog } from '@/app/pages/wallet/components/buy-dialog';
@@ -51,6 +53,7 @@ const TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 'Cript
         SkeletonModule,
         Sparkline,
         TableModule,
+        TagModule,
         WatchlistChart,
         WatchlistPlanDialog
     ],
@@ -95,6 +98,9 @@ const TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 'Cript
                                     <th scope="col" pSortableColumn="symbol" class="whitespace-nowrap">Ativo <p-sortIcon field="symbol" /></th>
                                     <th scope="col" pSortableColumn="change24hPercent" class="text-right! whitespace-nowrap">Cotação e 24h <p-sortIcon field="change24hPercent" /></th>
                                     <th scope="col" pSortableColumn="periodChangePercent" class="text-right! whitespace-nowrap">Em {{ periodLabel() }} <p-sortIcon field="periodChangePercent" /></th>
+                                    @if (signalsEnabled()) {
+                                        <th scope="col" pSortableColumn="rsi" class="whitespace-nowrap">Sinal técnico <p-sortIcon field="rsi" /></th>
+                                    }
                                     <th scope="col" class="whitespace-nowrap">Seu plano</th>
                                     <th scope="col" pSortableColumn="quantity" class="text-right! whitespace-nowrap">Na carteira <p-sortIcon field="quantity" /></th>
                                     <th scope="col" class="text-right! whitespace-nowrap">Ações</th>
@@ -129,11 +135,21 @@ const TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 'Cript
                                         }
                                     </td>
                                     <td class="text-right">
-                                        <div class="flex items-center justify-end gap-2">
+                                        <div class="flex flex-col items-end gap-1">
                                             <app-sparkline [values]="row.trend" [label]="'Tendência de ' + row.symbol + ' em ' + periodLabel()" />
-                                            <span class="text-sm w-20"><app-percent-change [value]="row.periodChangePercent" /></span>
+                                            <span class="text-sm"><app-percent-change [value]="row.periodChangePercent" /></span>
                                         </div>
                                     </td>
+                                    @if (signalsEnabled()) {
+                                        <td>
+                                            @if (row.reading; as reading) {
+                                                <p-tag [value]="reading.label" [icon]="reading.icon" [severity]="reading.severity" />
+                                                @if (row.rsi !== null) {
+                                                    <div class="text-surface-600 dark:text-surface-300 text-sm mt-1 whitespace-nowrap">RSI {{ row.rsi | number: '1.1-1' }} · {{ row.signal?.trend === 'UP' ? 'alta' : 'baixa' }}</div>
+                                                }
+                                            }
+                                        </td>
+                                    }
                                     <td>
                                         <app-plan-summary [item]="row" />
                                         @if (row.note) {
@@ -159,7 +175,33 @@ const TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 'Cript
                             </ng-template>
                             <ng-template #expandedrow let-row>
                                 <tr>
-                                    <td colspan="7">
+                                    <td [attr.colspan]="columnCount()">
+                                        @if (row.reading; as reading) {
+                                            <section class="mb-6" [attr.aria-label]="'Sinal técnico de ' + row.symbol">
+                                                <h3 class="text-base! font-semibold mt-0! mb-2!">Sinal técnico</h3>
+                                                <p class="m-0! mb-3!">{{ reading.reason }}</p>
+                                                @if (row.signal?.available) {
+                                                    <dl class="grid grid-cols-2 lg:grid-cols-4 gap-4 m-0">
+                                                        <div>
+                                                            <dt class="text-surface-600 dark:text-surface-300 text-sm">RSI de 14 dias</dt>
+                                                            <dd class="m-0 font-medium tabular-nums">{{ row.rsi | number: '1.1-1' }}</dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt class="text-surface-600 dark:text-surface-300 text-sm">Média de 20 dias</dt>
+                                                            <dd class="m-0 font-medium tabular-nums">{{ row.signal?.shortAverage | currency: 'BRL' : 'symbol' : '1.2-2' }}</dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt class="text-surface-600 dark:text-surface-300 text-sm">Média de 50 dias</dt>
+                                                            <dd class="m-0 font-medium tabular-nums">{{ row.signal?.longAverage | currency: 'BRL' : 'symbol' : '1.2-2' }}</dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt class="text-surface-600 dark:text-surface-300 text-sm">Dados até</dt>
+                                                            <dd class="m-0 font-medium">{{ row.signal?.asOf | date: 'short' }}</dd>
+                                                        </div>
+                                                    </dl>
+                                                }
+                                            </section>
+                                        }
                                         <app-watchlist-chart [item]="row" [days]="days()" [periodLabel]="periodLabel()" />
                                         @if (row.quoteUpdatedAt) {
                                             <p class="text-surface-600 dark:text-surface-300 text-sm mt-4! mb-0!">Última cotação em {{ row.quoteUpdatedAt | date: 'short' }}.</p>
@@ -172,11 +214,14 @@ const TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 'Cript
                             </ng-template>
                             <ng-template #emptymessage>
                                 <tr>
-                                    <td colspan="7" class="text-center text-surface-600 dark:text-surface-300 py-8!">Nenhum ativo encontrado com estes filtros.</td>
+                                    <td [attr.colspan]="columnCount()" class="text-center text-surface-600 dark:text-surface-300 py-8!">Nenhum ativo encontrado com estes filtros.</td>
                                 </tr>
                             </ng-template>
                         </p-table>
                     </div>
+                    @if (signalsEnabled()) {
+                        <p class="text-surface-600 dark:text-surface-300 text-sm mt-4! mb-0!">O sinal técnico usa os fechamentos diários e descreve o histórico de preços. Ele não prevê o futuro nem é recomendação de investimento.</p>
+                    }
                 }
             </section>
         } @else {
@@ -224,8 +269,12 @@ export class Watchlist {
         const type = this.typeFilter();
         return (this.items() ?? [])
             .filter((item) => (type === 'ALL' || item.assetType === type) && (!term || item.symbol.toLocaleLowerCase('pt-BR').includes(term) || item.name.toLocaleLowerCase('pt-BR').includes(term)))
-            .map((item) => ({ ...item, trend: item.prices.map((point) => point.price) }));
+            .map((item) => ({ ...item, trend: item.prices.map((point) => point.price), rsi: item.signal?.rsi ?? null, reading: item.signal ? signalReading(item.signal) : null }));
     });
+
+    /** Com o módulo de projeções desligado, nenhum item traz o sinal, e a coluna some. */
+    protected readonly signalsEnabled = computed(() => (this.items() ?? []).some((item) => item.signal !== null));
+    protected readonly columnCount = computed(() => (this.signalsEnabled() ? 8 : 7));
 
     protected readonly countLabel = computed(() => {
         const shown = this.rows().length;
@@ -284,7 +333,7 @@ export class Watchlist {
     protected openBuy(item: WatchlistItem): void {
         this.rememberFocus();
         const { symbol, name, assetType, quantity, averagePrice, currentPrice } = item;
-        this.buyPosition.set(isHeld(item) && averagePrice !== null ? { symbol, name, assetType, quantity, averagePrice } : null);
+        this.buyPosition.set(isHeld(item) && averagePrice !== null ? { symbol, name, assetType, quantity, averagePrice, currentPrice } : null);
         this.buyAsset.set(isHeld(item) ? null : { symbol, name, assetType, price: currentPrice });
         this.buyVisible.set(true);
     }

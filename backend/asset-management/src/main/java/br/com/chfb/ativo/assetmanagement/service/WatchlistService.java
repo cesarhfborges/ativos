@@ -17,12 +17,15 @@ import br.com.chfb.ativo.assetmanagement.repository.WatchlistItemRepository;
 import br.com.chfb.ativo.sharedkernel.market.Quote;
 import br.com.chfb.ativo.sharedkernel.market.QuoteLookup;
 import br.com.chfb.ativo.sharedkernel.market.SymbolTrackedEvent;
+import br.com.chfb.ativo.sharedkernel.market.TechnicalSignal;
+import br.com.chfb.ativo.sharedkernel.market.TechnicalSignals;
 import br.com.chfb.ativo.sharedkernel.settings.AppSettings;
 import br.com.chfb.ativo.sharedkernel.settings.SettingKeys;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,6 +48,7 @@ public class WatchlistService {
     private final AssetRegistrar assetRegistrar;
     private final AppSettings appSettings;
     private final ApplicationEventPublisher events;
+    private final Optional<TechnicalSignals> technicalSignals;
     private final TransactionTemplate transactions;
 
     public WatchlistService(
@@ -56,6 +60,7 @@ public class WatchlistService {
             AssetRegistrar assetRegistrar,
             AppSettings appSettings,
             ApplicationEventPublisher events,
+            Optional<TechnicalSignals> technicalSignals,
             PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.walletRepository = walletRepository;
@@ -65,6 +70,7 @@ public class WatchlistService {
         this.assetRegistrar = assetRegistrar;
         this.appSettings = appSettings;
         this.events = events;
+        this.technicalSignals = technicalSignals;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -143,6 +149,7 @@ public class WatchlistService {
         List<String> symbols = items.stream().map(item -> item.getAsset().getSymbol()).toList();
         Map<String, Quote> quotes = quoteLookup.findBySymbols(symbols);
         Map<String, MarketAssetResponse> market = marketOverview.bySymbols(symbols, days);
+        Map<String, TechnicalSignal> signals = technicalSignals.map(service -> service.forSymbols(symbols)).orElseGet(Map::of);
         Map<UUID, WalletPosition> positions = walletRepository.findByUserId(userId)
                 .map(wallet -> positionRepository.findActiveByWalletId(wallet.getId()).stream()
                         .collect(Collectors.toMap(position -> position.getAsset().getId(), Function.identity())))
@@ -152,12 +159,13 @@ public class WatchlistService {
                         item,
                         quotes.get(item.getAsset().getSymbol()),
                         market.get(item.getAsset().getSymbol()),
-                        positions.get(item.getAsset().getId())))
+                        positions.get(item.getAsset().getId()),
+                        signals.get(item.getAsset().getSymbol())))
                 .toList();
     }
 
     private static WatchlistItemResponse response(
-            WatchlistItem item, Quote quote, MarketAssetResponse market, WalletPosition position) {
+            WatchlistItem item, Quote quote, MarketAssetResponse market, WalletPosition position, TechnicalSignal signal) {
         Asset asset = item.getAsset();
         return new WatchlistItemResponse(
                 item.getId(),
@@ -177,6 +185,7 @@ public class WatchlistService {
                 market.prices(),
                 position == null ? BigDecimal.ZERO : position.getQuantity(),
                 position == null ? null : position.getAveragePrice(),
-                item.getCreatedAt());
+                item.getCreatedAt(),
+                signal);
     }
 }

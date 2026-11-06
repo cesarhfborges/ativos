@@ -96,6 +96,10 @@ predictive:
   risk:
     max-crypto-share: 0.70
     max-asset-share: 0.50
+  # Limites do RSI para a leitura técnica. O RSI e as médias usam períodos fixos: 14, 20 e 50 fechamentos.
+  signal:
+    oversold: 30
+    overbought: 70
 
 springdoc:
   api-docs:

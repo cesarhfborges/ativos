@@ -46,6 +46,8 @@ export interface Asset {
     symbol: string;
     name: string;
     assetType: AssetType;
+    /** Última cotação gravada; nula se o ativo nunca foi cotado. */
+    price?: number | null;
 }
 
 /** Ativo encontrado no provedor de cotações; sem cotação, `price` é nulo. */
@@ -65,11 +67,12 @@ export interface Position {
     assetType: AssetType;
     quantity: number;
     averagePrice: number;
+    /** Última cotação gravada; nula se o ativo nunca foi cotado. */
+    currentPrice: number | null;
 }
 
 /** Sem cotação, `currentPrice` é nulo e o valor de mercado usa o preço médio, com lucro zero. */
 export interface DashboardPosition extends Position {
-    currentPrice: number | null;
     investedValue: number;
     marketValue: number;
     profitLoss: number;
@@ -272,6 +275,21 @@ export interface AdminSettings {
     system: SystemInfo;
 }
 
+/** Leitura técnica, igual para todos. Com `available` falso, faltam preços ou eles estão antigos, e as leituras ficam nulas. */
+export interface TechnicalSignal {
+    available: boolean;
+    momentum: 'OVERSOLD' | 'NEUTRAL' | 'OVERBOUGHT' | null;
+    trend: 'UP' | 'DOWN' | null;
+    rsi: number | null;
+    shortAverage: number | null;
+    longAverage: number | null;
+    oversoldLimit: number;
+    overboughtLimit: number;
+    closes: number;
+    requiredCloses: number;
+    asOf: string | null;
+}
+
 /** O que o usuário espera do ativo. Preço nulo significa que ele não o definiu. */
 export interface WatchlistPlan {
     buyBelow: number | null;
@@ -303,6 +321,8 @@ export interface WatchlistItem extends WatchlistPlan {
     quantity: number;
     averagePrice: number | null;
     createdAt: string;
+    /** Nulo com o módulo de projeções desligado. */
+    signal: TechnicalSignal | null;
 }
 
 export interface SyncStatus {

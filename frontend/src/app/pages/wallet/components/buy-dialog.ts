@@ -19,6 +19,7 @@ import { DecimalPaste } from '@/app/core/decimal-paste';
 import { ConfirmService } from '@/app/core/confirm.service';
 import { DatePickerLabels } from '@/app/core/date-picker-labels';
 import { dateClause, toInstant } from '@/app/core/operation-date';
+import { canSuggestPrice, isSuggestedPrice, PriceSuggestion, suggestionFor } from '@/app/core/price-suggestion';
 import { WalletService } from '@/app/core/wallet.service';
 import { AssetLookupDialog } from '@/app/shared/asset-lookup-dialog';
 
@@ -112,6 +113,18 @@ function purchaseAmount(control: AbstractControl): ValidationErrors | null {
                 </div>
             }
 
+            <!-- O preço vem primeiro: é a partir dele que se informa a quantidade ou o valor da compra. -->
+            <div class="flex flex-col gap-2">
+                <label for="buy-price" class="font-medium">Preço unitário</label>
+                <p-inputnumber appDecimalPaste inputId="buy-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('unitPrice')" />
+                @if (error('unitPrice'); as message) {
+                    <p-message severity="error" size="small" variant="simple" [text]="message" />
+                }
+                @if (priceFromQuote()) {
+                    <small class="text-muted-color">{{ backdated() ? 'Esta é a última cotação, de agora. Informe o preço da data da operação.' : 'Última cotação do sistema. Ajuste se você pagou outro preço.' }}</small>
+                }
+            </div>
+
             @if (isCrypto()) {
                 <div class="flex flex-col gap-2">
                     <span id="buy-entry-label" class="font-medium">Informar a compra por</span>
@@ -140,24 +153,12 @@ function purchaseAmount(control: AbstractControl): ValidationErrors | null {
                     }
                 </div>
             }
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="flex flex-col gap-2">
-                    <label for="buy-price" class="font-medium">Preço unitário</label>
-                    <p-inputnumber appDecimalPaste inputId="buy-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('unitPrice')" />
-                    @if (error('unitPrice'); as message) {
-                        <p-message severity="error" size="small" variant="simple" [text]="message" />
-                    }
-                    @if (priceFromQuote()) {
-                        <small class="text-muted-color">Cotação atual. Ajuste se você pagou outro preço.</small>
-                    }
-                </div>
-                <div class="flex flex-col gap-2">
-                    <label for="buy-fee" class="font-medium">Taxa <span class="text-muted-color font-normal">(opcional)</span></label>
-                    <p-inputnumber appDecimalPaste inputId="buy-fee" formControlName="fee" mode="currency" currency="BRL" locale="pt-BR" [min]="0" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('fee')" />
-                    @if (error('fee'); as message) {
-                        <p-message severity="error" size="small" variant="simple" [text]="message" />
-                    }
-                </div>
+            <div class="flex flex-col gap-2">
+                <label for="buy-fee" class="font-medium">Taxa <span class="text-muted-color font-normal">(opcional)</span></label>
+                <p-inputnumber appDecimalPaste inputId="buy-fee" formControlName="fee" mode="currency" currency="BRL" locale="pt-BR" [min]="0" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('fee')" />
+                @if (error('fee'); as message) {
+                    <p-message severity="error" size="small" variant="simple" [text]="message" />
+                }
             </div>
 
             <div class="flex flex-col gap-2">
@@ -264,7 +265,7 @@ export class BuyDialog {
     protected readonly lookupType = signal<AssetType>('STOCK');
     private returnFocusTo: HTMLElement | null = null;
     /** Cotação trazida da busca, para avisar que o preço não foi o usuário que informou. */
-    private readonly quote = signal<{ symbol: string; price: number } | null>(null);
+    private readonly quote = signal<PriceSuggestion | null>(null);
 
     protected readonly isCrypto = computed(() => {
         this.formEvents();
@@ -290,9 +291,8 @@ export class BuyDialog {
 
     protected readonly priceFromQuote = computed(() => {
         this.formEvents();
-        const quote = this.quote();
         const { symbol, unitPrice } = this.form.getRawValue();
-        return !!quote && quote.price === unitPrice && quote.symbol === symbol?.trim().toUpperCase();
+        return isSuggestedPrice(unitPrice, symbol, this.quote());
     });
 
     protected readonly header = computed(() => {
@@ -336,8 +336,17 @@ export class BuyDialog {
 
         // Ao mudar o símbolo depois de escolher um ativo, tipo e nome voltam a ser editáveis.
         this.form.controls.symbol.valueChanges.pipe(takeUntilDestroyed()).subscribe((symbol) => {
-            if (this.knownAsset() && this.knownAsset()?.symbol !== symbol?.trim().toUpperCase()) {
+            const typed = symbol?.trim().toUpperCase();
+            if (this.knownAsset() && this.knownAsset()?.symbol !== typed) {
                 this.releaseAsset();
+            }
+            // O preço sugerido era de outro ativo: se ficasse, pareceria o preço deste.
+            const quote = this.quote();
+            if (quote && quote.symbol !== typed) {
+                if (this.form.controls.unitPrice.value === quote.price) {
+                    this.form.controls.unitPrice.setValue(null);
+                }
+                this.quote.set(null);
             }
         });
 
@@ -392,7 +401,7 @@ export class BuyDialog {
             name.setValue(candidate.name);
         }
         unitPrice.setValue(candidate.price);
-        this.quote.set(candidate.price === null ? null : { symbol: candidate.symbol, price: candidate.price });
+        this.quote.set(suggestionFor(candidate.symbol, candidate.price));
         this.failure.set(null);
         this.symbolIssue.set(null);
         this.searches.next(candidate.symbol);
@@ -425,6 +434,7 @@ export class BuyDialog {
         this.form.controls.assetType.disable();
         this.form.controls.name.setValue(asset.name);
         this.form.controls.name.disable();
+        this.suggestPrice(asset.symbol, asset.price);
     }
 
     protected typeLabel(type: AssetType): string {
@@ -486,6 +496,16 @@ export class BuyDialog {
         });
     }
 
+    /** A cotação trazida pela busca no mercado é mais recente que a do catálogo e continua valendo. */
+    private suggestPrice(symbol: string, price: number | null | undefined): void {
+        const { unitPrice } = this.form.controls;
+        const suggestion = suggestionFor(symbol, price);
+        if (suggestion && this.quote()?.symbol !== symbol && canSuggestPrice(unitPrice.value, this.quote())) {
+            this.quote.set(suggestion);
+            unitPrice.setValue(suggestion.price);
+        }
+    }
+
     private releaseAsset(): void {
         this.knownAsset.set(null);
         this.form.controls.assetType.enable();
@@ -499,6 +519,9 @@ export class BuyDialog {
         this.today = new Date();
         this.quote.set(null);
         this.form.reset({ symbol: position?.symbol ?? '', name: '', assetType: position?.assetType ?? 'STOCK', amount: null, quantity: null, unitPrice: null, fee: null, executedAt: null, entryMode: position?.assetType === 'CRYPTO' ? 'AMOUNT' : 'QUANTITY' });
+        if (position) {
+            this.suggestPrice(position.symbol, position.currentPrice);
+        }
         this.failure.set(null);
         this.symbolIssue.set(null);
         this.submitting.set(false);

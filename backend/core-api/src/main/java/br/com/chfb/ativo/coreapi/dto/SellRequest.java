@@ -26,7 +26,7 @@ public record SellRequest(
         @Schema(example = "120.00")
         @NotNull
         @Positive
-        @Digits(integer = 14, fraction = 4)
+        @Digits(integer = 16, fraction = 8)
         BigDecimal unitPrice,
 
         @Schema(example = "1.50", description = "Sem valor, a taxa é zero.")

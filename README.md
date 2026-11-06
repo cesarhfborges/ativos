@@ -2,7 +2,7 @@
 
 Sistema multiusuário para acompanhar carteiras de ações e criptomoedas: patrimônio, rentabilidade, histórico e projeções. O escopo completo está em [`docs/`](docs/).
 
-O repositório contém autenticação, registro de compras e vendas, coleta de cotações, dashboard, projeções e o frontend que usa esses recursos. Todos os valores são tratados como BRL; o suporte a outras moedas está planejado em [`docs/07_plano_multimoeda.md`](docs/07_plano_multimoeda.md).
+O repositório contém autenticação, registro de compras e vendas, coleta de cotações, dashboard, projeções, administração e o frontend que usa esses recursos. Todos os valores são tratados como BRL; o suporte a outras moedas está planejado em [`docs/07_plano_multimoeda.md`](docs/07_plano_multimoeda.md).
 
 ## Stack
 
@@ -74,8 +74,11 @@ Variáveis do `application.yml`:
 | `MARKET_COLLECTION_CRON` | `0 0 * * * *` | Agenda da coleta que gera os snapshots patrimoniais |
 | `MARKET_COLLECT_ON_STARTUP` | `true` | Atualiza as cotações ao iniciar, sem gerar snapshot |
 | `PREDICTIVE_ENABLED` | `true` | Liga o módulo de projeções |
+| `APP_ADMIN_EMAIL` | Vazio | Conta promovida a administrador ao iniciar, se existir |
 
-Os padrões são apenas de desenvolvimento: em produção, defina todas elas. O que estiver no `application-local.yml` tem prioridade sobre `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` quando o perfil `local` está ativo.
+Os padrões são apenas de desenvolvimento: em produção, defina todas elas. O que estiver no `application-local.yml` tem prioridade sobre o `application.yml` quando o perfil `local` está ativo. O Docker Compose lê `APP_ADMIN_EMAIL` e `BRAPI_TOKEN` do arquivo `.env`, que fica fora do git.
+
+Outros ajustes, como o cadastro público e as premissas das projeções, são feitos pelo admin na tela de configurações, sem reiniciar. Veja [`docs/08_etapa_6_administracao_e_permissoes.md`](docs/08_etapa_6_administracao_e_permissoes.md).
 
 ## Executar com Docker
 
@@ -128,6 +131,8 @@ O Spring Boot DevTools reinicia a aplicação quando uma classe compilada muda e
 
 As sessões ficam no banco, então o login continua válido depois do reinício. O DevTools só funciona em execução local: ele não entra no WAR nem na imagem Docker.
 
+**Atenção:** com a aplicação rodando, qualquer `mvn compile` ou `mvn verify` provoca esse reinício, e as migrações novas são aplicadas no banco local na hora. Faça o backup antes de compilar uma mudança de esquema.
+
 ## Frontend
 
 Com o backend em `localhost:8080`:
@@ -142,7 +147,7 @@ npm test -- --watch=false --browsers=ChromeHeadless
 
 No `docker compose up --build`, o frontend sobe em <http://localhost:4200>, servido pelo Nginx, que encaminha `/api/` ao backend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
 
-Telas: login, registro, painel para acompanhamento (patrimônio, desempenho, posições a mercado, evolução patrimonial, alocação e últimas operações), carteira para registrar compras e vendas,xtrato com filtro por tipo e lucro realizado, e projeções. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
+Telas: login, registro, painel para acompanhamento (patrimônio, desempenho, posições a mercado, evolução patrimonial, alocação e últimas operações), carteira para registrar compras e vendas, extrato com filtro por tipo e lucro realizado, projeções e, para administradores, visão geral, usuários, ativos, configurações e auditoria. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
 
 ## Documentação da API
 
@@ -162,7 +167,8 @@ A sessão usa o cookie `JSESSIONID`, e todo `POST` exige o token CSRF: o valor d
 | Endpoint | Sessão | Descrição | Respostas |
 | --- | --- | --- | --- |
 | `GET /api/auth/csrf` | Não | Entrega o cookie `XSRF-TOKEN`; chame antes do primeiro `POST` e depois do logout | `204` |
-| `POST /api/auth/register` | Não | Cria a conta, sem iniciar sessão. Corpo: `name`, `email`, `password` (mínimo de 8 caracteres), `confirmPassword` e, opcionais, `phone`, `birthDate` e `investorProfile` | `201`, `400`, `409` |
+| `GET /api/auth/settings` | Não | Informa se o cadastro público está aberto | `200` |
+| `POST /api/auth/register` | Não | Cria a conta, sem iniciar sessão. Corpo: `name`, `email`, `password` (mínimo de 8 caracteres), `confirmPassword` e, opcionais, `phone`, `birthDate` e `investorProfile`. Com o cadastro fechado, responde `403` | `201`, `400`, `403`, `409` |
 | `POST /api/auth/login` | Não | Inicia a sessão e renova o token CSRF. Corpo: `email`, `password` | `200`, `400`, `401` |
 | `GET /api/auth/me` | Sim | Retorna o usuário logado | `200`, `401` |
 | `POST /api/auth/logout` | Sim | Encerra a sessão | `204` |
@@ -201,31 +207,96 @@ Para adicionar um provedor, implemente `CryptoMarketProvider` ou `StockMarketPro
 
 ## Busca de ativos
 
-`GET /api/assets?query=pe` procura no catálogo de ativos já cadastrados, compartilhado entre os usuários, pelo início do símbolo ou por parte do nome. A tela de compra usa essa busca para sugerir o símbolo e preencher o tipo; símbolos novos continuam aceitos e são cadastrados na primeira compra.
+`GET /api/assets?query=pe` procura no catálogo de ativos já cadastrados, compartilhado entre os usuários, pelo início do símbolo ou por parte do nome. A tela de compra usa essa busca para sugerir o símbolo e preencher o tipo; símbolos novos são cadastrados na primeira compra.
+
+`GET /api/assets/lookup?query=petr&type=STOCK` procura no provedor de cotações, inclusive ativos ainda não cadastrados, e devolve nome e cotação atual. Em ações, usa a listagem da Brapi. Em cripto, só encontra pares negociados na Binance na moeda de cotação (BRL), os únicos que o sistema consegue cotar. Com `available: false`, o provedor não respondeu, o que não significa que o ativo não existe.
+
+No primeiro cadastro, o símbolo é conferido no provedor de cotações. Se ele não existir, ou só existir no outro tipo, a compra responde `422` com `code: SYMBOL_NOT_FOUND` e, se houver, `suggestedType`. Com `acceptUnverified: true`, o ativo é cadastrado como não verificado. Sem resposta do provedor, como ações fora da lista de teste da Brapi sem `BRAPI_TOKEN`, o cadastro é aceito como não verificado.
+
+## Preço médio
+
+O preço médio inclui as taxas de compra, então o lucro das vendas é calculado sobre o custo real. Preços e preço médio têm até oito casas decimais; taxas e totais, quatro.
 
 ## Data da operação
 
 `POST /api/transactions/buy` e `/sell` aceitam `executedAt` (ISO 8601), para lançar operações passadas; sem ele, vale o momento atual, e datas futuras são recusadas. Toda operação refaz a posição a partir do histórico, em ordem de data, então um lançamento retroativo recalcula o preço médio e o lucro das vendas seguintes, e é recusado (`422`) se deixar alguma venda sem quantidade. A coluna `recorded_at` guarda quando o lançamento foi feito.
 
+## Extrato
+
+`GET /api/transactions` devolve as operações da mais recente à mais antiga, paginadas como o `simplePaginate` do Laravel: não há `COUNT`, nem `total` e `last_page`. A consulta busca uma linha além de `per_page` para saber se existe outra página.
+
+```json
+{
+  "current_page": 2,
+  "data": [],
+  "first_page_url": "/api/transactions?type=BUY&per_page=20&page=1",
+  "from": 21,
+  "next_page_url": "/api/transactions?type=BUY&per_page=20&page=3",
+  "path": "/api/transactions",
+  "per_page": 20,
+  "prev_page_url": "/api/transactions?type=BUY&per_page=20&page=1",
+  "to": 40
+}
+```
+
+Os links são relativos, para valerem atrás de proxy, e mantêm os filtros. `from` e `to` ficam nulos numa página sem itens.
+
+| Parâmetro | Filtra por |
+| --- | --- |
+| `page`, `per_page` | Página, a partir de 1 (padrão `1`), e itens por página, até 200 (padrão `50`) |
+| `asset` | Parte do símbolo ou do nome, sem diferenciar maiúsculas |
+| `type` | `BUY` ou `SELL` |
+| `assetType` | `STOCK` ou `CRYPTO` |
+| `status` | `ACTIVE` (válidas) ou `REVERSED` (estornadas) |
+| `from`, `to` | Data da operação, em ISO 8601, inclusive os extremos |
+| `minTotal`, `maxTotal` | Valor total da operação, inclusive os extremos |
+
+Um intervalo invertido responde `400`. A tela de extrato abre com os últimos 90 dias: limpar as duas datas mostra todo o histórico.
+
 ## Estorno
 
 `POST /api/transactions/{id}/reverse` corrige uma compra ou venda registrada por engano. Nada é apagado: a operação continua no extrato como estornada, e a posição é refeita a partir das demais, em ordem, recalculando o preço médio e o lucro realizado das vendas seguintes.
 
-O estorno é recusado (`422`) se uma venda posterior ficaria sem quantidade: nesse caso, estorne a venda antes. Os snapshots antigos não são reescritos, nem no estorno nem em lançamentos retroativos: o histórico patrimonial mostra o que estava registrado naquele momento.
+O estorno é recusado (`422`) se uma venda posterior ficaria sem quantidade: nesse caso, estorne a venda antes.
+
+Os snapshots antigos não são reescritos, mas `GET /api/dashboard/history` não conta o que foi estornado: os pontos gravados entre o lançamento e o estorno de uma operação são recalculados na leitura, só com as operações válidas lançadas até ali e o preço daquele instante (ou o custo, se não havia preço). Um ponto sem nenhuma posição restante sai do histórico. Assim, a evolução patrimonial, o retorno e as projeções ignoram os estornos, inclusive os antigos. Lançamentos retroativos continuam sem alterar os pontos anteriores a eles.
 
 ## Projeções
 
 `POST /api/predictions/simulate` recebe `months` (6, 12, 24 ou 60), `monthlyContribution` e `scenario` (`OPTIMISTIC`, `REALISTIC` ou `PESSIMISTIC`) e devolve a curva com intervalo de confiança de 80%, as premissas e os alertas de risco.
 
-- **Retorno e volatilidade:** com 90 dias ou mais de snapshots, são medidos na carteira, descontando o efeito de novas compras e limitando o retorno anual a uma faixa de -50% a +100%. Com menos, valem os valores de referência de `predictive.reference`, que são premissas configuradas, não dados de mercado.
-- **Cenários:** o otimista soma 5 pontos percentuais ao retorno anual; o pessimista subtrai 5 e aplica uma queda imediata de 40% em cripto (ou de 20% em ações, se não houver cripto).
+- **Retorno e volatilidade:** medidos no histórico de cotações dos ativos de hoje, ponderados pelo valor atual, então compras e vendas não afetam o resultado. O retorno é a tendência de uma regressão linear sobre o logaritmo do índice da carteira, limitada a uma faixa de -50% a +100%. Ativos com menos de 60 dias de cotações usam os valores de referência, que são premissas configuradas, não dados de mercado. A resposta informa a origem em `assumptions.source` (`MARKET`, `BLENDED` ou `REFERENCE`) e a parte medida em `assumptions.coverage`.
+- **Cenários:** o otimista soma 5 pontos percentuais ao retorno anual; o pessimista subtrai 5 e aplica uma queda imediata de 40% em cripto (ou de 20% em ações, se não houver cripto). A tendência olha para trás: depois de um ano de queda, o cenário realista também aponta queda.
 - **Alertas:** mais de 70% em cripto ou mais de 50% em um único ativo.
 
-Tudo isso é ajustável em `predictive.*` no `application.yml`. Com `PREDICTIVE_ENABLED=false`, o endpoint deixa de existir e o restante do sistema não muda.
+Os padrões ficam em `predictive.*` no `application.yml`, e o admin pode alterá-los na tela de configurações, exceto o nível de confiança. Com `PREDICTIVE_ENABLED=false`, o endpoint deixa de existir e o restante do sistema não muda.
+
+## Administração
+
+`/api/admin/**` exige o papel `ADMIN`. O primeiro administrador é definido por `APP_ADMIN_EMAIL`: crie a conta pela tela de registro e reinicie. O admin vê totais, nunca as carteiras de outros usuários. Regras e telas estão em [`docs/08_etapa_6_administracao_e_permissoes.md`](docs/08_etapa_6_administracao_e_permissoes.md).
+
+| Endpoint | Descrição |
+| --- | --- |
+| `GET /api/admin/overview` | Totais e saúde das cotações |
+| `POST /api/admin/quotes/collect` | Coleta as cotações agora, respeitando o intervalo mínimo |
+| `POST /api/admin/positions/rebuild` | Refaz todas as posições a partir das operações |
+| `GET`, `POST /api/admin/users` | Lista e cria contas |
+| `PUT /api/admin/users/{id}` | Edita a conta; mudar e-mail ou papel encerra as sessões dela |
+| `PUT /api/admin/users/{id}/active` | Ativa ou desativa a conta |
+| `POST /api/admin/users/{id}/password` | Define uma nova senha e encerra as sessões |
+| `POST /api/admin/users/{id}/sessions/end` | Encerra as sessões da conta |
+| `GET /api/admin/assets` | Lista o catálogo de ativos |
+| `PUT`, `DELETE /api/admin/assets/{id}` | Corrige nome e tipo; remove um ativo sem operações |
+| `POST /api/admin/assets/{id}/verify` | Confere o ativo no provedor de cotações |
+| `GET`, `PUT /api/admin/settings` | Lê e altera as configurações gerais |
+| `DELETE /api/admin/settings/{key}` | Volta uma configuração ao valor padrão |
+| `GET /api/admin/audit` | Lista as ações administrativas |
+
+**Ao atualizar de uma versão anterior:** execute "Recalcular posições" uma vez na visão geral. A taxa de compra passou a fazer parte do custo, e preço médio e lucro das vendas antigas só mudam com esse recálculo.
 
 ## Deploy em Tomcat
 
-O build gera `backend/core-api/target/ativos-backend.war`. Use o Tomcat 10.1: versões anteriores à 10 não são compatíveis com Jakarta EE.
+O build (`mvn clean package`) gera `backend/core-api/target/ativos-backend.war`. Sem o `clean`, classes de arquivos já removidos podem continuar no WAR e impedir a aplicação de iniciar. Use o Tomcat 10.1: versões anteriores à 10 não são compatíveis com Jakarta EE.
 
 1. Defina as variáveis de produção da seção [Ambientes](#ambientes) no processo do Tomcat, por exemplo em `bin/setenv.sh`.
 2. Copie o arquivo para `webapps/ROOT.war`, para publicar a aplicação na raiz. Com outro nome, o nome do arquivo vira prefixo das URLs.
@@ -240,7 +311,7 @@ mvn verify
 ```
 
 - `SecurityConfigTest` não precisa de Docker.
-- `AtivosApplicationIT`, `AuthFlowIT`, `OpenApiIT` e `OpenApiDisabledIT` sobem um PostgreSQL real com Testcontainers. **Sem Docker disponível, esses testes são ignorados sem falhar o build.** Confira no resultado se eles foram executados.
+- `AtivosApplicationIT`, `AuthFlowIT`, `WalletFlowIT`, `OpenApiIT` e `OpenApiDisabledIT` sobem um PostgreSQL real com Testcontainers. **Sem Docker disponível, esses testes são ignorados sem falhar o build.** Confira no resultado se eles foram executados.
 
 ## Migrações
 
@@ -257,6 +328,7 @@ O Flyway não gerencia as tabelas `spring_session*`: o próprio Spring Session a
 | 3. Cotações e provedores | Concluída |
 | 4. Dashboard | Concluída |
 | 5. Predição e análise | Concluída |
+| 6. Administração e permissões | Concluída |
 
 ## Comandos úteis
 

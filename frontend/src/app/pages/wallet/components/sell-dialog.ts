@@ -74,7 +74,7 @@ type ControlName = 'symbol' | 'quantity' | 'unitPrice' | 'fee' | 'executedAt';
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="flex flex-col gap-2">
                     <label for="sell-price" class="font-medium">Preço unitário</label>
-                    <p-inputnumber appDecimalPaste inputId="sell-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="4" [fluid]="true" [invalid]="!!error('unitPrice')" />
+                    <p-inputnumber appDecimalPaste inputId="sell-price" formControlName="unitPrice" mode="currency" currency="BRL" locale="pt-BR" [maxFractionDigits]="8" [fluid]="true" [invalid]="!!error('unitPrice')" />
                     @if (error('unitPrice'); as message) {
                         <p-message severity="error" size="small" variant="simple" [text]="message" />
                     }
@@ -113,7 +113,7 @@ type ControlName = 'symbol' | 'quantity' | 'unitPrice' | 'fee' | 'executedAt';
                 <dt>Valor líquido a receber</dt>
                 <dd class="m-0 text-right font-semibold">{{ net() | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
                 <dt>Preço médio da posição</dt>
-                <dd class="m-0 text-right">{{ holding()?.averagePrice | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>
+                <dd class="m-0 text-right">{{ holding()?.averagePrice | currency: 'BRL' : 'symbol' : '1.2-8' }}</dd>
                 @if (!backdated() && result(); as value) {
                     <dt>{{ value > 0 ? 'Lucro na venda' : 'Prejuízo na venda' }}</dt>
                     <dd class="m-0 text-right font-semibold" [class]="value > 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ value > 0 ? '+' : '−' }} {{ absolute(value) | currency: 'BRL' : 'symbol' : '1.2-4' }}</dd>

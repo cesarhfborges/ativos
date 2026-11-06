@@ -26,14 +26,30 @@ export function buyTotal(quantity: number, unitPrice: number, fee: number): numb
     return roundMoney(quantity * unitPrice + fee);
 }
 
+/**
+ * Quantidade comprada com um valor que já inclui a taxa, em oito casas como no backend. Arredonda para baixo,
+ * para o total nunca passar do valor pago; o `toFixed` tira o ruído que faria 0,29 / 0,01 virar 28,99999999.
+ */
+export function quantityForAmount(amount: number, unitPrice: number, fee: number): number {
+    if (unitPrice <= 0 || amount <= fee) {
+        return 0;
+    }
+    return Math.floor(Number((((amount - fee) / unitPrice) * 1e8).toFixed(3))) / 1e8;
+}
+
 /** Valor líquido de uma venda; negativo quando a taxa supera o valor vendido. */
 export function sellNet(quantity: number, unitPrice: number, fee: number): number {
     return roundMoney(quantity * unitPrice - fee);
 }
 
-/** Preço médio ponderado depois da compra; a taxa não entra no cálculo, como no backend. */
-export function averageAfterBuy(position: Position, quantity: number, unitPrice: number): number {
-    return roundMoney((position.quantity * position.averagePrice + quantity * unitPrice) / (position.quantity + quantity));
+/** Mesma escala e arredondamento dos preços no backend, com oito casas. */
+export function roundPrice(value: number): number {
+    return Math.round((value + Number.EPSILON) * 1e8) / 1e8;
+}
+
+/** Preço médio ponderado depois da compra; a taxa faz parte do custo, como no backend. */
+export function averageAfterBuy(position: Position, quantity: number, unitPrice: number, fee: number): number {
+    return roundPrice((position.quantity * position.averagePrice + quantity * unitPrice + fee) / (position.quantity + quantity));
 }
 
 /** Resultado da venda sobre o preço médio, já descontada a taxa. */

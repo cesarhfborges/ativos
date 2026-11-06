@@ -16,4 +16,7 @@ public interface QuoteLookup {
 
     /** Último preço registrado até {@code at}; símbolos sem registro até lá ficam de fora do mapa. */
     Map<String, BigDecimal> findPricesAt(Collection<String> symbols, Instant at);
+
+    /** Todos os preços registrados no intervalo, inclusive os extremos; símbolos sem registro ficam de fora do mapa. */
+    Map<String, List<PricePoint>> findPricesBetween(Collection<String> symbols, Instant from, Instant to);
 }

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { catchError, map, Observable, of, switchMap, tap } from 'rxjs';
-import { LoginRequest, RegisterRequest, User } from './api.models';
+import { LoginRequest, PublicSettings, RegisterRequest, User } from './api.models';
 
 const API = '/api/auth';
 
@@ -12,6 +12,13 @@ export class AuthService {
 
     readonly user = this.currentUser.asReadonly();
     readonly isAuthenticated = computed(() => this.currentUser() !== null);
+    /** Só decide o que mostrar: quem garante a permissão é o backend. */
+    readonly isAdmin = computed(() => this.currentUser()?.role === 'ADMIN');
+
+    /** O que as telas públicas precisam saber. Sem resposta, o cadastro aparece e o backend decide. */
+    publicSettings(): Observable<PublicSettings> {
+        return this.http.get<PublicSettings>(`${API}/settings`).pipe(catchError(() => of({ registrationEnabled: true })));
+    }
 
     /** Roda antes da primeira navegação: garante o cookie CSRF e recupera a sessão existente. */
     restoreSession(): Observable<void> {

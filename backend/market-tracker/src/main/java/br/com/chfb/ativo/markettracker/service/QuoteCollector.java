@@ -5,6 +5,8 @@ import br.com.chfb.ativo.markettracker.provider.StockMarketProvider;
 import br.com.chfb.ativo.sharedkernel.market.ActiveSymbols;
 import br.com.chfb.ativo.sharedkernel.market.ActiveSymbolsProvider;
 import br.com.chfb.ativo.sharedkernel.market.PricePoint;
+import br.com.chfb.ativo.sharedkernel.settings.AppSettings;
+import br.com.chfb.ativo.sharedkernel.settings.SettingKeys;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -23,8 +25,6 @@ import org.springframework.stereotype.Service;
 public class QuoteCollector {
 
     private static final Logger log = LoggerFactory.getLogger(QuoteCollector.class);
-    /** Limita as atualizações pedidas pelos usuários, que consomem a cota das APIs externas. */
-    private static final Duration MANUAL_REFRESH_INTERVAL = Duration.ofMinutes(1);
     /**
      * Quem não tem preço mais antigo que isso recebe a carga inicial. Se ela falhar, é refeita nas próximas coletas,
      * até a própria coleta alcançar essa idade; um símbolo que o provedor nunca cota continua sendo tentado.
@@ -35,14 +35,17 @@ public class QuoteCollector {
     private final Optional<CryptoMarketProvider> cryptoProvider;
     private final Optional<StockMarketProvider> stockProvider;
     private final QuoteStore quoteStore;
+    private final AppSettings appSettings;
 
-    private Instant lastCollectedAt = Instant.EPOCH;
+    private volatile Instant lastCollectedAt = Instant.EPOCH;
 
     public QuoteCollector(
             ActiveSymbolsProvider activeSymbolsProvider,
             Optional<CryptoMarketProvider> cryptoProvider,
             Optional<StockMarketProvider> stockProvider,
-            QuoteStore quoteStore) {
+            QuoteStore quoteStore,
+            AppSettings appSettings) {
+        this.appSettings = appSettings;
         this.activeSymbolsProvider = activeSymbolsProvider;
         this.cryptoProvider = cryptoProvider;
         this.stockProvider = stockProvider;
@@ -66,13 +69,22 @@ public class QuoteCollector {
         return lastCollectedAt;
     }
 
-    /** Devolve {@code false} sem chamar os provedores se a última coleta foi há menos de um minuto. */
+    /**
+     * Limita as atualizações pedidas pelos usuários, que consomem a cota das APIs externas: devolve
+     * {@code false} sem chamar os provedores se a última coleta foi há menos que o intervalo configurado.
+     */
     public synchronized boolean refresh() {
-        if (Instant.now().isBefore(lastCollectedAt.plus(MANUAL_REFRESH_INTERVAL))) {
+        Duration interval = Duration.ofSeconds(appSettings.current().getInt(SettingKeys.MANUAL_REFRESH_SECONDS));
+        if (Instant.now().isBefore(lastCollectedAt.plus(interval))) {
             return false;
         }
         collect();
         return true;
+    }
+
+    /** Última coleta desde que a aplicação iniciou; {@code null} se ainda não houve. */
+    public Instant lastCollectedAt() {
+        return Instant.EPOCH.equals(lastCollectedAt) ? null : lastCollectedAt;
     }
 
     private void backfill(String group, Set<String> symbols, Optional<Function<String, List<PricePoint>>> fetcher) {

@@ -1,4 +1,4 @@
-import { CurrencyPipe, DecimalPipe, formatDate } from '@angular/common';
+import { CurrencyPipe, DecimalPipe, formatDate, formatPercent } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
@@ -233,9 +233,14 @@ export class Projections {
         if (!assumptions) {
             return '';
         }
-        return assumptions.source === 'OBSERVED'
-            ? `Retorno e volatilidade medidos nos ${assumptions.historyDays} dias de histórico da sua carteira.`
-            : 'Ainda não há histórico suficiente da sua carteira, então a simulação usa valores de referência configurados, que não vêm do mercado.';
+        switch (assumptions.source) {
+            case 'MARKET':
+                return `Tendência e volatilidade medidas em ${assumptions.historyDays} dias de cotações dos ativos que você tem hoje.`;
+            case 'BLENDED':
+                return `${formatPercent(assumptions.coverage, 'pt-BR', '1.0-0')} da carteira foi medido em ${assumptions.historyDays} dias de cotações. O restante ainda tem pouco histórico e usa valores de referência configurados, que não vêm do mercado.`;
+            default:
+                return 'Ainda não há histórico suficiente de cotações dos seus ativos, então a simulação usa valores de referência configurados, que não vêm do mercado.';
+        }
     });
 
     constructor() {

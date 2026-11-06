@@ -1,9 +1,12 @@
 /** Contratos da API REST (ver DTOs em backend/core-api e backend/asset-management). */
 
+export type Role = 'USER' | 'ADMIN';
+
 export interface User {
     id: string;
     name: string;
     email: string;
+    role: Role;
 }
 
 export interface LoginRequest {
@@ -43,6 +46,17 @@ export interface Asset {
     symbol: string;
     name: string;
     assetType: AssetType;
+}
+
+/** Ativo encontrado no provedor de cotações; sem cotação, `price` é nulo. */
+export interface AssetCandidate extends Asset {
+    price: number | null;
+}
+
+/** Com `available` falso, o provedor não respondeu: isso não significa que o ativo não existe. */
+export interface AssetLookup {
+    available: boolean;
+    candidates: AssetCandidate[];
 }
 
 export interface Position {
@@ -109,6 +123,21 @@ export interface Transaction {
     reversedAt: string | null;
 }
 
+export type TransactionStatus = 'ACTIVE' | 'REVERSED';
+
+/** Formato do simplePaginate do Laravel: sem total, a API só diz se existe uma próxima página. */
+export interface SimplePage<T> {
+    current_page: number;
+    data: T[];
+    first_page_url: string;
+    from: number | null;
+    next_page_url: string | null;
+    path: string;
+    per_page: number;
+    prev_page_url: string | null;
+    to: number | null;
+}
+
 /** Quando a operação aconteceu, em ISO 8601. Sem valor, é agora. */
 export interface OperationDate {
     executedAt?: string;
@@ -121,6 +150,8 @@ export interface BuyRequest extends OperationDate {
     quantity: number;
     unitPrice: number;
     fee: number;
+    /** Cadastra o ativo mesmo que o provedor de cotações não o encontre. */
+    acceptUnverified?: boolean;
 }
 
 export interface SellRequest extends OperationDate {
@@ -147,13 +178,105 @@ export interface SimulationResponse {
     /** Retorno anual usado no cenário: o base com o ajuste de cada cenário. */
     scenarioReturn: number;
     assumptions: {
-        source: 'OBSERVED' | 'REFERENCE';
+        source: 'MARKET' | 'BLENDED' | 'REFERENCE';
         annualReturn: number;
         annualVolatility: number;
         confidenceLevel: number;
         historyDays: number;
+        /** Fração da carteira, de 0 a 1, medida no histórico de cotações. */
+        coverage: number;
     };
     history: { date: string; value: number }[];
     projection: { date: string; expected: number; lower: number; upper: number }[];
     alerts: { severity: 'INFO' | 'WARNING'; title: string; message: string; suggestion: string | null }[];
+}
+
+export interface PublicSettings {
+    registrationEnabled: boolean;
+}
+
+export interface Page<T> {
+    items: T[];
+    total: number;
+}
+
+export interface AdminUser extends Profile {
+    role: Role;
+    active: boolean;
+    lastLoginAt: string | null;
+}
+
+export interface AdminUserUpdate extends ProfileDetails {
+    name: string;
+    email: string;
+    role: Role;
+}
+
+export interface AdminUserCreate extends AdminUserUpdate {
+    password: string;
+}
+
+export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED';
+
+export interface CatalogAsset extends Asset {
+    id: string;
+    verificationStatus: VerificationStatus;
+    openPositions: number;
+    transactions: number;
+}
+
+export interface AssetVerification {
+    asset: CatalogAsset;
+    check: 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE';
+}
+
+export interface AdminOverview {
+    totalUsers: number;
+    activeUsers: number;
+    admins: number;
+    wallets: number;
+    transactions: number;
+    collectionEnabled: boolean;
+    /** Coleta mais recente desde que a aplicação iniciou. */
+    lastCollectedAt: string | null;
+    activeSymbols: number;
+    symbolsWithoutQuote: string[];
+    symbolsWithStaleQuote: string[];
+}
+
+export interface AdminSetting {
+    key: string;
+    group: string;
+    label: string;
+    description: string;
+    type: 'BOOLEAN' | 'INTEGER' | 'PERCENT';
+    min: number | null;
+    max: number | null;
+    /** Em texto, como guardado. Percentuais em fração: 0.05 é 5%. */
+    value: string;
+    defaultValue: string;
+    overridden: boolean;
+}
+
+export interface SystemInfo {
+    cryptoProvider: string;
+    stockProvider: string;
+    brapiTokenConfigured: boolean;
+    collectionCron: string;
+    collectOnStartup: boolean;
+    predictiveEnabled: boolean;
+}
+
+export interface AdminSettings {
+    settings: AdminSetting[];
+    system: SystemInfo;
+}
+
+export interface AuditEntry {
+    id: string;
+    actorEmail: string;
+    action: string;
+    target: string | null;
+    details: string | null;
+    createdAt: string;
 }

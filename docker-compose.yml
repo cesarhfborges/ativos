@@ -28,6 +28,7 @@ services:
       DB_USERNAME: ativos
       DB_PASSWORD: ativos
       BRAPI_TOKEN: ${BRAPI_TOKEN:-}
+      APP_ADMIN_EMAIL: ${APP_ADMIN_EMAIL:-}
     ports:
       - "8080:8080"
     depends_on:

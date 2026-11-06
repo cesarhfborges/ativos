@@ -33,4 +33,8 @@ public class Wallet {
     public UUID getId() {
         return id;
     }
+
+    public UUID getUserId() {
+        return userId;
+    }
 }

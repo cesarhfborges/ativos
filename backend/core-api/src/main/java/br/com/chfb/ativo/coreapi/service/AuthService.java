@@ -5,8 +5,11 @@ import br.com.chfb.ativo.coreapi.dto.RegisterRequest;
 import br.com.chfb.ativo.coreapi.dto.UserResponse;
 import br.com.chfb.ativo.coreapi.entity.User;
 import br.com.chfb.ativo.coreapi.exception.EmailAlreadyInUseException;
+import br.com.chfb.ativo.coreapi.exception.RegistrationClosedException;
 import br.com.chfb.ativo.coreapi.repository.UserRepository;
 import br.com.chfb.ativo.coreapi.security.AuthenticatedUser;
+import br.com.chfb.ativo.sharedkernel.settings.AppSettings;
+import br.com.chfb.ativo.sharedkernel.settings.SettingKeys;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -29,19 +32,25 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
+    private final AppSettings appSettings;
     private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
     private final CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
 
     public AuthService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            AuthenticationManager authenticationManager) {
+            AuthenticationManager authenticationManager,
+            AppSettings appSettings) {
+        this.appSettings = appSettings;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
     }
 
     public UserResponse register(RegisterRequest request) {
+        if (!appSettings.current().getBoolean(SettingKeys.REGISTRATION_ENABLED)) {
+            throw new RegistrationClosedException();
+        }
         User user = new User(
                 request.name().strip(),
                 normalizeEmail(request.email()),
@@ -72,7 +81,13 @@ public class AuthService {
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, request, response);
 
-        return UserResponse.from((AuthenticatedUser) authentication.getPrincipal());
+        AuthenticatedUser user = (AuthenticatedUser) authentication.getPrincipal();
+        userRepository.updateLastLogin(user.getId(), Instant.now());
+        return UserResponse.from(user);
+    }
+
+    public boolean registrationEnabled() {
+        return appSettings.current().getBoolean(SettingKeys.REGISTRATION_ENABLED);
     }
 
     public static String normalizeEmail(String email) {

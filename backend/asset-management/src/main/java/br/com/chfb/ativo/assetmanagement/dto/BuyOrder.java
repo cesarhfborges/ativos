@@ -4,7 +4,10 @@ import br.com.chfb.ativo.assetmanagement.entity.AssetType;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** {@code name} é usado só no primeiro cadastro do ativo; sem {@code executedAt}, a operação é de agora. */
+/**
+ * {@code name} é usado só no primeiro cadastro do ativo; sem {@code executedAt}, a operação é de agora.
+ * {@code acceptUnverified} cadastra o ativo mesmo que o provedor de cotações não o encontre.
+ */
 public record BuyOrder(
         String symbol,
         String name,
@@ -12,5 +15,6 @@ public record BuyOrder(
         BigDecimal quantity,
         BigDecimal unitPrice,
         BigDecimal fee,
-        Instant executedAt) {
+        Instant executedAt,
+        boolean acceptUnverified) {
 }

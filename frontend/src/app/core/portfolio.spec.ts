@@ -1,5 +1,5 @@
 import { DashboardPosition } from './api.models';
-import { allocation, averageAfterBuy, buyTotal, roundMoney, saleResult, sellNet } from './portfolio';
+import { allocation, averageAfterBuy, buyTotal, quantityForAmount, roundMoney, saleResult, sellNet } from './portfolio';
 
 const position = (assetType: DashboardPosition['assetType'], quantity: number, averagePrice: number, marketValue: number) => ({ assetType, quantity, averagePrice, marketValue }) as DashboardPosition;
 
@@ -15,9 +15,27 @@ describe('portfolio', () => {
         expect(sellNet(0.25, 120, 1.5)).toBe(28.5);
     });
 
+    it('calcula a quantidade comprada com um valor que já inclui a taxa', () => {
+        expect(quantityForAmount(100, 50, 0)).toBe(2);
+        expect(quantityForAmount(101.5, 50, 1.5)).toBe(2);
+    });
+
+    it('arredonda a quantidade para baixo em oito casas, sem o ruído do ponto flutuante', () => {
+        expect(quantityForAmount(100, 417870, 0)).toBe(0.00023930);
+        expect(quantityForAmount(0.29, 0.01, 0)).toBe(29);
+        expect(buyTotal(quantityForAmount(100, 417870, 0), 417870, 0)).toBeLessThanOrEqual(100);
+    });
+
+    it('não calcula quantidade sem preço ou quando a taxa consome o valor', () => {
+        expect(quantityForAmount(100, 0, 0)).toBe(0);
+        expect(quantityForAmount(10, 50, 10)).toBe(0);
+        expect(quantityForAmount(10, 50, 20)).toBe(0);
+    });
+
     it('calcula o preço médio ponderado e o resultado da venda', () => {
         const held = position('CRYPTO', 1, 100, 0);
-        expect(averageAfterBuy(held, 1, 200)).toBe(150);
+        expect(averageAfterBuy(held, 1, 200, 0)).toBe(150);
+        expect(averageAfterBuy(held, 1, 200, 10)).toBe(155);
         expect(saleResult(held, 1, 120, 5)).toBe(15);
     });
 

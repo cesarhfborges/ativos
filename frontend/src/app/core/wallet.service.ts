@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
-import { Asset, BuyRequest, DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, SellRequest, Transaction, TransactionType } from './api.models';
+import { map, Observable } from 'rxjs';
+import { Asset, AssetLookup, AssetType, BuyRequest, DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, SellRequest, SimplePage, Transaction } from './api.models';
+import { EMPTY_STATEMENT_FILTER, StatementFilter, statementParams } from './statement-filter';
 
 @Injectable({ providedIn: 'root' })
 export class WalletService {
@@ -9,6 +10,11 @@ export class WalletService {
 
     searchAssets(query: string): Observable<Asset[]> {
         return this.http.get<Asset[]>('/api/assets', { params: { query } });
+    }
+
+    /** Procura no provedor de cotações, inclusive ativos que ainda não estão no catálogo. */
+    lookupAssets(query: string, type: AssetType): Observable<AssetLookup> {
+        return this.http.get<AssetLookup>('/api/assets/lookup', { params: { query, type } });
     }
 
     overview(): Observable<DashboardOverview> {
@@ -40,7 +46,11 @@ export class WalletService {
         return this.http.post<Transaction>('/api/transactions/sell', body);
     }
 
-    statement(page: number, size: number, type?: TransactionType | null): Observable<Transaction[]> {
-        return this.http.get<Transaction[]>('/api/transactions', { params: { page, size, ...(type ? { type } : {}) } });
+    statement(filter: StatementFilter, page: number, perPage: number): Observable<SimplePage<Transaction>> {
+        return this.http.get<SimplePage<Transaction>>('/api/transactions', { params: { ...statementParams(filter), page, per_page: perPage } });
+    }
+
+    recentTransactions(count: number): Observable<Transaction[]> {
+        return this.statement(EMPTY_STATEMENT_FILTER, 1, count).pipe(map((page) => page.data));
     }
 }

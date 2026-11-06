@@ -26,7 +26,25 @@ public class Asset {
     @Column(name = "asset_type", nullable = false)
     private AssetType assetType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_status", nullable = false)
+    private VerificationStatus verificationStatus;
+
     protected Asset() {
+    }
+
+    /** Muda para todos os usuários: o catálogo é compartilhado. */
+    public void update(String name, AssetType assetType) {
+        this.name = name;
+        this.assetType = assetType;
+    }
+
+    public void markVerification(VerificationStatus verificationStatus) {
+        this.verificationStatus = verificationStatus;
+    }
+
+    public VerificationStatus getVerificationStatus() {
+        return verificationStatus;
     }
 
     public UUID getId() {

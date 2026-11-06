@@ -50,6 +50,11 @@ public class QuoteStore implements QuoteLookup {
         return symbols.isEmpty() ? Map.of() : historyRepository.findPricesAt(symbols, at);
     }
 
+    @Override
+    public Map<String, List<PricePoint>> findPricesBetween(Collection<String> symbols, Instant from, Instant to) {
+        return symbols.isEmpty() ? Map.of() : historyRepository.findPricesBetween(symbols, from, to);
+    }
+
     void save(Map<String, BigDecimal> prices, Instant updatedAt) {
         prices.forEach((symbol, price) -> {
             BigDecimal scaled = scaled(price);

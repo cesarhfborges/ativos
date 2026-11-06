@@ -10,5 +10,8 @@ export const authGuard: CanActivateFn = (_route, state) => {
     return inject(Router).createUrlTree(['/auth/login'], { queryParams: { returnUrl: state.url } });
 };
 
+/** Esconde as telas de administração. Quem garante a permissão é o backend, que responde 403 nas chamadas. */
+export const adminGuard: CanActivateFn = () => (inject(AuthService).isAdmin() ? true : inject(Router).createUrlTree(['/']));
+
 /** Impede que quem já está logado veja as telas de login e registro. */
 export const guestGuard: CanActivateFn = () => (inject(AuthService).isAuthenticated() ? inject(Router).createUrlTree(['/']) : true);

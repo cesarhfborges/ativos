@@ -57,7 +57,7 @@ public class PortfolioValuation {
                 quote == null ? null : quote.lastUpdatedAt());
     }
 
-    private static BigDecimal money(BigDecimal value) {
+    static BigDecimal money(BigDecimal value) {
         return value.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 }

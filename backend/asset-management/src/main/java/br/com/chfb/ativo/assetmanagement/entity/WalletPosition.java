@@ -31,7 +31,7 @@ public class WalletPosition {
     @Column(nullable = false, precision = 24, scale = 8)
     private BigDecimal quantity;
 
-    @Column(name = "average_price", nullable = false, precision = 18, scale = 4)
+    @Column(name = "average_price", nullable = false, precision = 24, scale = 8)
     private BigDecimal averagePrice;
 
     protected WalletPosition() {
@@ -41,14 +41,14 @@ public class WalletPosition {
         this.walletId = walletId;
         this.asset = asset;
         this.quantity = Amounts.quantity(BigDecimal.ZERO);
-        this.averagePrice = Amounts.money(BigDecimal.ZERO);
+        this.averagePrice = Amounts.price(BigDecimal.ZERO);
     }
 
-    /** Com a posição zerada, a fórmula resulta no próprio preço da compra. A taxa não entra no preço médio. */
-    public void addPurchase(BigDecimal purchasedQuantity, BigDecimal unitPrice) {
+    /** A taxa faz parte do custo: o preço médio é quanto cada unidade custou de fato. */
+    public void addPurchase(BigDecimal purchasedQuantity, BigDecimal unitPrice, BigDecimal fee) {
         BigDecimal newQuantity = Amounts.quantity(quantity.add(purchasedQuantity));
-        BigDecimal totalCost = quantity.multiply(averagePrice).add(purchasedQuantity.multiply(unitPrice));
-        averagePrice = Amounts.moneyQuotient(totalCost, newQuantity);
+        BigDecimal totalCost = quantity.multiply(averagePrice).add(purchasedQuantity.multiply(unitPrice)).add(fee);
+        averagePrice = Amounts.priceQuotient(totalCost, newQuantity);
         quantity = newQuantity;
     }
 

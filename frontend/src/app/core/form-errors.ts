@@ -34,6 +34,7 @@ export function controlError(control: AbstractControl | null): string | null {
     if (errors['maxBytes']) return `Use no máximo ${errors['maxBytes']} bytes; acentos contam em dobro.`;
     if (errors['pattern']) return 'Use até 20 letras, números, ponto, hífen ou sublinhado, sem espaços.';
     if (errors['positive']) return 'Informe um valor maior que zero.';
+    if (errors['belowFee']) return 'O valor precisa ser maior que a taxa.';
     if (errors['max']) return `O máximo disponível é ${errors['max'].max.toLocaleString('pt-BR', { maximumFractionDigits: 8 })}.`;
     return 'Valor inválido.';
 }

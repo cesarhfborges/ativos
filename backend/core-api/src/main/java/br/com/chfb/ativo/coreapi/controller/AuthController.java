@@ -2,6 +2,7 @@ package br.com.chfb.ativo.coreapi.controller;
 
 import br.com.chfb.ativo.coreapi.config.OpenApiConfig;
 import br.com.chfb.ativo.coreapi.dto.LoginRequest;
+import br.com.chfb.ativo.coreapi.dto.PublicSettingsResponse;
 import br.com.chfb.ativo.coreapi.dto.RegisterRequest;
 import br.com.chfb.ativo.coreapi.dto.UserResponse;
 import br.com.chfb.ativo.coreapi.security.AuthenticatedUser;
@@ -50,7 +51,21 @@ public class AuthController {
         token.getToken();
     }
 
+    @Operation(summary = "Informa o que as telas públicas precisam saber, como se o cadastro está aberto")
+    @ApiResponse(responseCode = "200", description = "Configurações públicas")
+    @GetMapping("/settings")
+    public PublicSettingsResponse settings() {
+        return new PublicSettingsResponse(authService.registrationEnabled());
+    }
+
     @Operation(summary = "Cria uma conta", description = "Não inicia a sessão: depois do registro, faça o login.")
+    @ApiResponse(
+            responseCode = "403",
+            description = "Cadastro fechado pelo administrador",
+            content = @Content(
+                    mediaType = "application/problem+json",
+                    schema = @Schema(implementation = ProblemDetail.class))
+    )
     @ApiResponse(responseCode = "201", description = "Conta criada")
     @ApiResponse(
             responseCode = "400",

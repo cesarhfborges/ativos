@@ -248,7 +248,7 @@ export class Dashboard {
         forkJoin({
             overview: this.wallet.overview(),
             positions: this.wallet.positions(),
-            recent: this.wallet.statement(0, RECENT_SIZE)
+            recent: this.wallet.recentTransactions(RECENT_SIZE)
         }).subscribe({
             next: ({ overview, positions, recent }) => {
                 this.overview.set(overview);

@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { map } from 'rxjs';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -20,7 +21,10 @@ import { AuthCard } from './auth-card';
     imports: [AuthCard, ButtonModule, InputTextModule, MessageModule, PasswordModule, ProfileFields, ReactiveFormsModule, RouterLink],
     template: `
         <app-auth-card title="Criar conta" subtitle="Comece a acompanhar seus investimentos">
-            <form class="flex flex-col gap-6" novalidate [formGroup]="form" (ngSubmit)="submit()">
+            @if (!registrationEnabled()) {
+                <p-message severity="info" text="O cadastro de novas contas está fechado. Fale com o administrador." />
+            }
+            <form class="flex flex-col gap-6" novalidate [class.hidden]="!registrationEnabled()" [formGroup]="form" (ngSubmit)="submit()">
                 @if (failure(); as message) {
                     <p-message severity="error" [text]="message" />
                 }
@@ -111,6 +115,7 @@ export class Register {
 
     protected readonly submitting = signal(false);
     protected readonly failure = signal<string | null>(null);
+    protected readonly registrationEnabled = toSignal(this.auth.publicSettings().pipe(map((settings) => settings.registrationEnabled)), { initialValue: true });
 
     protected error(name: 'name' | 'email' | 'password'): string | null {
         this.formEvents();

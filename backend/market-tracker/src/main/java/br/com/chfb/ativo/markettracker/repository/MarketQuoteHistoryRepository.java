@@ -83,6 +83,25 @@ public class MarketQuoteHistoryRepository {
         return prices;
     }
 
+    public Map<String, List<PricePoint>> findPricesBetween(Collection<String> symbols, Instant from, Instant to) {
+        Map<String, List<PricePoint>> prices = new HashMap<>();
+        namedJdbc.query(
+                """
+                SELECT symbol, quoted_at, price
+                FROM market_quote_history
+                WHERE symbol IN (:symbols) AND quoted_at BETWEEN :from AND :to
+                """,
+                new MapSqlParameterSource()
+                        .addValue("symbols", symbols)
+                        .addValue("from", Timestamp.from(from))
+                        .addValue("to", Timestamp.from(to)),
+                row -> {
+                    prices.computeIfAbsent(row.getString("symbol"), symbol -> new ArrayList<>())
+                            .add(new PricePoint(row.getTimestamp("quoted_at").toInstant(), row.getBigDecimal("price")));
+                });
+        return prices;
+    }
+
     /** Símbolos com algum registro até {@code at}. */
     public Set<String> findSymbolsWithHistoryUntil(Collection<String> symbols, Instant at) {
         return new HashSet<>(namedJdbc.queryForList(

@@ -2,28 +2,39 @@ package br.com.chfb.ativo.assetmanagement.service;
 
 import br.com.chfb.ativo.assetmanagement.dto.AssetResponse;
 import br.com.chfb.ativo.assetmanagement.dto.BuyOrder;
+import br.com.chfb.ativo.assetmanagement.dto.RebuildResult;
 import br.com.chfb.ativo.assetmanagement.dto.SellOrder;
+import br.com.chfb.ativo.assetmanagement.dto.StatementFilter;
+import br.com.chfb.ativo.assetmanagement.dto.StatementPage;
 import br.com.chfb.ativo.assetmanagement.dto.TransactionResponse;
 import br.com.chfb.ativo.assetmanagement.entity.Amounts;
 import br.com.chfb.ativo.assetmanagement.entity.Asset;
+import br.com.chfb.ativo.assetmanagement.entity.AssetType;
 import br.com.chfb.ativo.assetmanagement.entity.TransactionType;
+import br.com.chfb.ativo.assetmanagement.entity.VerificationStatus;
 import br.com.chfb.ativo.assetmanagement.entity.Wallet;
 import br.com.chfb.ativo.assetmanagement.entity.WalletPosition;
 import br.com.chfb.ativo.assetmanagement.entity.WalletTransaction;
 import br.com.chfb.ativo.assetmanagement.exception.AssetTypeConflictException;
 import br.com.chfb.ativo.assetmanagement.exception.BusinessRuleException;
+import br.com.chfb.ativo.assetmanagement.exception.SymbolNotFoundException;
 import br.com.chfb.ativo.assetmanagement.exception.TransactionNotFoundException;
 import br.com.chfb.ativo.assetmanagement.repository.AssetRepository;
+import br.com.chfb.ativo.assetmanagement.repository.StatementQuery;
 import br.com.chfb.ativo.assetmanagement.repository.WalletPositionRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletTransactionRepository;
+import br.com.chfb.ativo.sharedkernel.market.SymbolCheck;
+import br.com.chfb.ativo.sharedkernel.market.SymbolVerifier;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Toda operação recebe o id do usuário logado e só alcança a carteira dele. */
 @Service
@@ -38,12 +49,21 @@ public class WalletService {
     private final AssetRepository assetRepository;
     private final WalletPositionRepository positionRepository;
     private final WalletTransactionRepository transactionRepository;
+    private final StatementQuery statementQuery;
+    private final SymbolVerifier symbolVerifier;
+    private final TransactionTemplate transactions;
 
     public WalletService(
             WalletRepository walletRepository,
             AssetRepository assetRepository,
             WalletPositionRepository positionRepository,
-            WalletTransactionRepository transactionRepository) {
+            WalletTransactionRepository transactionRepository,
+            StatementQuery statementQuery,
+            SymbolVerifier symbolVerifier,
+            PlatformTransactionManager transactionManager) {
+        this.statementQuery = statementQuery;
+        this.symbolVerifier = symbolVerifier;
+        this.transactions = new TransactionTemplate(transactionManager);
         this.walletRepository = walletRepository;
         this.assetRepository = assetRepository;
         this.positionRepository = positionRepository;
@@ -51,12 +71,15 @@ public class WalletService {
     }
 
     @Transactional(readOnly = true)
-    public List<TransactionResponse> statement(UUID userId, TransactionType type, int page, int size) {
+    public StatementPage statement(UUID userId, StatementFilter filter, int page, int perPage) {
         return walletRepository.findByUserId(userId)
-                .map(wallet -> transactionRepository.findStatement(wallet.getId(), type, PageRequest.of(page, size)).stream()
-                        .map(TransactionResponse::from)
-                        .toList())
-                .orElseGet(List::of);
+                .map(wallet -> {
+                    List<WalletTransaction> rows = statementQuery.find(wallet.getId(), filter, (page - 1) * perPage, perPage + 1);
+                    return new StatementPage(
+                            rows.stream().limit(perPage).map(TransactionResponse::from).toList(),
+                            rows.size() > perPage);
+                })
+                .orElseGet(() -> new StatementPage(List.of(), false));
     }
 
     @Transactional(readOnly = true)
@@ -67,15 +90,20 @@ public class WalletService {
                 .toList();
     }
 
-    @Transactional
+    /** O provedor é consultado antes da transação: uma API lenta não pode segurar a trava da carteira. */
     public TransactionResponse buy(UUID userId, BuyOrder order) {
+        VerificationStatus status = verifyNewSymbol(order);
+        return transactions.execute(transaction -> registerBuy(userId, order, status));
+    }
+
+    private TransactionResponse registerBuy(UUID userId, BuyOrder order, VerificationStatus status) {
         Wallet wallet = lockWallet(userId);
         BigDecimal quantity = Amounts.quantity(order.quantity());
-        BigDecimal unitPrice = Amounts.money(order.unitPrice());
+        BigDecimal unitPrice = Amounts.price(order.unitPrice());
         BigDecimal fee = Amounts.money(order.fee());
         BigDecimal total = Amounts.money(quantity.multiply(unitPrice).add(fee));
 
-        Asset asset = findOrRegisterAsset(order);
+        Asset asset = findOrRegisterAsset(order, status);
         if (positionRepository.findByWalletIdAndAssetId(wallet.getId(), asset.getId()).isEmpty()) {
             positionRepository.save(new WalletPosition(wallet.getId(), asset));
         }
@@ -90,7 +118,7 @@ public class WalletService {
     public TransactionResponse sell(UUID userId, SellOrder order) {
         Wallet wallet = lockWallet(userId);
         BigDecimal quantity = Amounts.quantity(order.quantity());
-        BigDecimal unitPrice = Amounts.money(order.unitPrice());
+        BigDecimal unitPrice = Amounts.price(order.unitPrice());
         BigDecimal fee = Amounts.money(order.fee());
 
         // Ativo desconhecido e posição inexistente recebem a mesma resposta de custódia insuficiente.
@@ -138,6 +166,25 @@ public class WalletService {
         return result(transaction);
     }
 
+    /** Refaz todas as posições de todas as carteiras, depois de uma mudança na regra de cálculo. */
+    @Transactional
+    public RebuildResult rebuildAllPositions() {
+        int walletCount = 0;
+        int positionCount = 0;
+        for (Wallet wallet : walletRepository.findAll()) {
+            walletRepository.findByUserIdForUpdate(wallet.getUserId());
+            for (WalletPosition position : positionRepository.findAllByWalletId(wallet.getId())) {
+                rebuildPosition(
+                        wallet,
+                        position.getAsset(),
+                        "Uma venda de %s ficaria sem quantidade em custódia".formatted(position.getAsset().getSymbol()));
+                positionCount++;
+            }
+            walletCount++;
+        }
+        return new RebuildResult(walletCount, positionCount);
+    }
+
     /**
      * Refaz a posição a partir das operações válidas, em ordem de data. Uma operação no meio do histórico
      * muda o preço médio e o lucro de tudo o que veio depois, e não pode deixar uma venda sem custódia.
@@ -146,7 +193,7 @@ public class WalletService {
         WalletPosition recalculated = new WalletPosition(wallet.getId(), asset);
         for (WalletTransaction active : transactionRepository.findActiveByWalletAndAsset(wallet.getId(), asset.getId())) {
             if (active.getType() == TransactionType.BUY) {
-                recalculated.addPurchase(active.getQuantity(), active.getUnitPrice());
+                recalculated.addPurchase(active.getQuantity(), active.getUnitPrice(), active.getFee());
             } else {
                 if (!recalculated.holds(active.getQuantity())) {
                     throw new BusinessRuleException(shortageMessage);
@@ -169,11 +216,34 @@ public class WalletService {
         });
     }
 
-    private Asset findOrRegisterAsset(BuyOrder order) {
+    /**
+     * Só o primeiro cadastro de um símbolo é conferido. Sem resposta do tipo escolhido, o outro tipo ainda
+     * pode revelar um engano, como BTC lançado como ação quando a Brapi está sem token.
+     */
+    private VerificationStatus verifyNewSymbol(BuyOrder order) {
+        String symbol = normalizeSymbol(order.symbol());
+        if (order.acceptUnverified() || assetRepository.findBySymbol(symbol).isPresent()) {
+            return VerificationStatus.UNVERIFIED;
+        }
+        SymbolCheck chosen = symbolVerifier.verify(symbol, order.assetType().toAssetClass());
+        if (chosen == SymbolCheck.FOUND) {
+            return VerificationStatus.VERIFIED;
+        }
+        AssetType otherType = order.assetType() == AssetType.CRYPTO ? AssetType.STOCK : AssetType.CRYPTO;
+        if (symbolVerifier.verify(symbol, otherType.toAssetClass()) == SymbolCheck.FOUND) {
+            throw new SymbolNotFoundException(symbol, otherType);
+        }
+        if (chosen == SymbolCheck.NOT_FOUND) {
+            throw new SymbolNotFoundException(symbol, null);
+        }
+        return VerificationStatus.UNVERIFIED;
+    }
+
+    private Asset findOrRegisterAsset(BuyOrder order, VerificationStatus status) {
         String symbol = normalizeSymbol(order.symbol());
         Asset asset = assetRepository.findBySymbol(symbol).orElseGet(() -> {
             String name = order.name() == null || order.name().isBlank() ? symbol : order.name().strip();
-            assetRepository.insertIfAbsent(UUID.randomUUID(), symbol, name, order.assetType().name());
+            assetRepository.insertIfAbsent(UUID.randomUUID(), symbol, name, order.assetType().name(), status.name());
             return assetRepository.findBySymbol(symbol).orElseThrow();
         });
         if (asset.getAssetType() != order.assetType()) {

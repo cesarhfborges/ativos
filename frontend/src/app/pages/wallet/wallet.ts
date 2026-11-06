@@ -82,7 +82,7 @@ export class Wallet {
 
     protected load(): void {
         this.loading.set(true);
-        forkJoin({ positions: this.wallet.positions(), recent: this.wallet.statement(0, RECENT_SIZE) }).subscribe({
+        forkJoin({ positions: this.wallet.positions(), recent: this.wallet.recentTransactions(RECENT_SIZE) }).subscribe({
             next: ({ positions, recent }) => {
                 this.positions.set(positions);
                 this.recent.set(recent);

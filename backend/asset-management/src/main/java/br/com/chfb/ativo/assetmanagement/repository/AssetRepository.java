@@ -4,6 +4,7 @@ import br.com.chfb.ativo.assetmanagement.entity.Asset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -22,11 +23,17 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
             """)
     List<Asset> search(@Param("prefix") String prefix, @Param("contains") String contains, Pageable pageable);
 
+    @Query("""
+            select a from Asset a
+            where a.symbol like :prefix escape '!' or upper(a.name) like :contains escape '!'
+            """)
+    Page<Asset> searchPage(@Param("prefix") String prefix, @Param("contains") String contains, Pageable pageable);
+
     @Modifying
     @Query(
             value = """
-                    INSERT INTO assets (id, symbol, name, asset_type)
-                    VALUES (:id, :symbol, :name, :assetType)
+                    INSERT INTO assets (id, symbol, name, asset_type, verification_status)
+                    VALUES (:id, :symbol, :name, :assetType, :verificationStatus)
                     ON CONFLICT (symbol) DO NOTHING
                     """,
             nativeQuery = true)
@@ -34,5 +41,6 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
             @Param("id") UUID id,
             @Param("symbol") String symbol,
             @Param("name") String name,
-            @Param("assetType") String assetType);
+            @Param("assetType") String assetType,
+            @Param("verificationStatus") String verificationStatus);
 }

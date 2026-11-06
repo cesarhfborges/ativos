@@ -1,6 +1,8 @@
 package br.com.chfb.ativo.markettracker.provider;
 
+import br.com.chfb.ativo.sharedkernel.market.AssetSearchResult;
 import br.com.chfb.ativo.sharedkernel.market.PricePoint;
+import br.com.chfb.ativo.sharedkernel.market.SymbolCheck;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -14,4 +16,10 @@ public interface CryptoMarketProvider {
 
     /** Fechamentos diários do último ano, só de dias encerrados. Vazio se o provedor não tiver o símbolo. */
     List<PricePoint> fetchCryptoDailyCloses(String symbol);
+
+    /** {@code NOT_FOUND} só quando o provedor afirma que o símbolo não existe; qualquer outra falha é {@code UNAVAILABLE}. */
+    SymbolCheck checkCryptoSymbol(String symbol);
+
+    /** Procura por símbolo ou nome. Falhas do provedor voltam como indisponível, nunca como exceção. */
+    AssetSearchResult searchCrypto(String query, int limit);
 }

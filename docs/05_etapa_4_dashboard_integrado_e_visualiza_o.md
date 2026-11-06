@@ -16,7 +16,11 @@ Integrar os dados contábeis do módulo `asset-management` com as cotações em 
    * Preço Médio vs. Cotação Atual.
    * Lucro/Prejuízo individual por ativo.
 3. Endpoint de histórico patrimonial (`GET /api/dashboard/history`):
-   * Lista de pontos temporais obtidos da tabela `portfolio_snapshots`.
+   * Lista de pontos temporais obtidos da tabela `portfolio_snapshots`, sem o efeito das operações estornadas depois de cada ponto.
+4. Endpoint de comportamento de mercado (`GET /api/dashboard/market?days=30`):
+   * Por posição aberta: variação em 24 horas e no período, mínima, máxima e preços, a partir de `market_quote_history`.
+5. Atualização manual (`POST /api/dashboard/refresh-quotes`):
+   * Coleta as cotações na hora, sem gerar snapshot, respeitando o intervalo mínimo configurado pelo admin.
 
 ### 2. Interface de Dashboard no Angular
 1. Criar cards superiores de resumo:
@@ -27,6 +31,8 @@ Integrar os dados contábeis do módulo `asset-management` com as cotações em 
 3. Integrar biblioteca de gráficos (ex: Chart.js / ngx-charts):
    * Gráfico de linha demonstrando a evolução patrimonial ao longo do tempo (baseado nos snapshots horários/diários).
    * Gráfico de pizza com a distribuição de alocação da carteira (% Cripto vs. % Ações).
+   * Gráfico de retorno da carteira, sem o efeito das compras.
+   * Desempenho dos ativos no período, destaques de mercado e tendência por ativo na tabela de posições.
 
 ## Critérios de Aceite
 * [ ] O dashboard reflete imediatamente oscilações nas cotações registradas pelo módulo `market-tracker`.

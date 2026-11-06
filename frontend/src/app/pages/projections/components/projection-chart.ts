@@ -58,7 +58,7 @@ export class ProjectionChart {
         return {
             datasets: [
                 { label: 'Patrimônio real', data: this.realPoints(), borderColor: colors.real, backgroundColor: colors.real, borderWidth: 2, pointRadius: this.realPoints().length > 30 ? 0 : 3 },
-                { label: SCENARIO_LABELS[this.selected()], data: line(active.projection, 'expected'), borderColor: colors.selected, backgroundColor: colors.selected, borderWidth: 3, pointRadius: 0, pointHoverRadius: 5 },
+                { label: SCENARIO_LABELS[this.selected()], data: line(active.projection, 'expected'), borderColor: colors.selected, backgroundColor: colors.selected, borderWidth: 3, borderDash: [2, 4], pointRadius: 0, pointHoverRadius: 5 },
                 ...others.map((scenario) => ({
                     label: SCENARIO_LABELS[scenario],
                     data: line(this.scenarios()[scenario].projection, 'expected'),

@@ -27,13 +27,16 @@ public class DashboardService {
     private final PortfolioSnapshotRepository snapshotRepository;
     private final WalletTransactionRepository transactionRepository;
     private final PortfolioValuation valuation;
+    private final ReversalHistoryCorrector historyCorrector;
 
     public DashboardService(
             WalletRepository walletRepository,
             WalletPositionRepository positionRepository,
             PortfolioSnapshotRepository snapshotRepository,
             WalletTransactionRepository transactionRepository,
-            PortfolioValuation valuation) {
+            PortfolioValuation valuation,
+            ReversalHistoryCorrector historyCorrector) {
+        this.historyCorrector = historyCorrector;
         this.walletRepository = walletRepository;
         this.positionRepository = positionRepository;
         this.snapshotRepository = snapshotRepository;
@@ -79,11 +82,9 @@ public class DashboardService {
     public List<PortfolioHistoryPoint> history(UUID userId, int days) {
         Instant from = Instant.now().minus(Duration.ofDays(days));
         return walletRepository.findByUserId(userId)
-                .map(wallet -> snapshotRepository
-                        .findByWalletIdAndSnapshotTimeGreaterThanEqualOrderBySnapshotTime(wallet.getId(), from)
-                        .stream()
-                        .map(PortfolioHistoryPoint::from)
-                        .toList())
+                .map(wallet -> historyCorrector.correct(
+                        wallet.getId(),
+                        snapshotRepository.findByWalletIdAndSnapshotTimeGreaterThanEqualOrderBySnapshotTime(wallet.getId(), from)))
                 .orElseGet(List::of);
     }
 

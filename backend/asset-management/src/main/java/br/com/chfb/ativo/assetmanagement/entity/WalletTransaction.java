@@ -42,7 +42,7 @@ public class WalletTransaction {
     @Column(nullable = false, precision = 24, scale = 8, updatable = false)
     private BigDecimal quantity;
 
-    @Column(name = "unit_price", nullable = false, precision = 18, scale = 4, updatable = false)
+    @Column(name = "unit_price", nullable = false, precision = 24, scale = 8, updatable = false)
     private BigDecimal unitPrice;
 
     @Column(nullable = false, precision = 18, scale = 4, updatable = false)
@@ -125,6 +125,16 @@ public class WalletTransaction {
 
     public boolean isReversed() {
         return reversedAt != null;
+    }
+
+    /** Já estava lançada em {@code time}, ainda que tenha sido estornada depois. */
+    public boolean wasRecordedBy(Instant time) {
+        return !recordedAt.isAfter(time);
+    }
+
+    /** Contava como válida em {@code time}, mas foi estornada depois. */
+    public boolean wasReversedAfter(Instant time) {
+        return wasRecordedBy(time) && reversedAt != null && reversedAt.isAfter(time);
     }
 
     public Instant getReversedAt() {

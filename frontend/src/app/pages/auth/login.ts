@@ -2,6 +2,7 @@ import { Component, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { map } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
@@ -50,10 +51,12 @@ import { AuthCard } from './auth-card';
                 <p-button type="submit" label="Entrar" styleClass="w-full" [loading]="submitting()" />
             </form>
 
-            <p class="text-center mt-6! mb-0!">
-                Ainda não tem conta?
-                <a routerLink="/auth/register" class="text-primary font-medium underline">Criar conta</a>
-            </p>
+            @if (registrationEnabled()) {
+                <p class="text-center mt-6! mb-0!">
+                    Ainda não tem conta?
+                    <a routerLink="/auth/register" class="text-primary font-medium underline">Criar conta</a>
+                </p>
+            }
         </app-auth-card>
     `
 })
@@ -72,6 +75,7 @@ export class Login {
 
     protected readonly submitting = signal(false);
     protected readonly failure = signal<string | null>(null);
+    protected readonly registrationEnabled = toSignal(this.auth.publicSettings().pipe(map((settings) => settings.registrationEnabled)), { initialValue: false });
 
     protected error(name: 'email' | 'password'): string | null {
         this.formEvents();

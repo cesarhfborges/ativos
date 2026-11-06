@@ -69,11 +69,11 @@ type TypeFilter = AssetType | 'ALL';
                         </td>
                         <td class="text-right tabular-nums whitespace-nowrap">
                             <div>{{ row.quantity | number: '1.0-8' }}</div>
-                            <div class="text-muted-color text-sm">Médio {{ row.averagePrice | currency: 'BRL' : 'symbol' : '1.2-4' }}</div>
+                            <div class="text-muted-color text-sm">Médio {{ row.averagePrice | currency: 'BRL' : 'symbol' : '1.2-8' }}</div>
                         </td>
                         <td class="text-right">
                             @if (row.currentPrice !== null) {
-                                <div class="tabular-nums whitespace-nowrap">{{ row.currentPrice | currency: 'BRL' : 'symbol' : '1.2-4' }}</div>
+                                <div class="tabular-nums whitespace-nowrap">{{ row.currentPrice | currency: 'BRL' : 'symbol' : '1.2-8' }}</div>
                                 @if (market()) {
                                     <div class="text-sm"><app-percent-change [value]="row.change24h" /></div>
                                 }

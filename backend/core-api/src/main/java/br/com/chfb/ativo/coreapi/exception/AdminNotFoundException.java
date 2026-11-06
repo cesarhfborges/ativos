@@ -1,0 +1,10 @@
+package br.com.chfb.ativo.coreapi.exception;
+
+public class AdminNotFoundException extends RuntimeException {
+
+    private static final long serialVersionUID = 1L;
+
+    public AdminNotFoundException(String message) {
+        super(message);
+    }
+}

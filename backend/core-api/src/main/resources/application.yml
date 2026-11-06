@@ -33,11 +33,18 @@ server:
         secure: ${SESSION_COOKIE_SECURE:false}
 
 app:
+  # Conta promovida a administrador ao iniciar, se existir.
+  admin-email: ${APP_ADMIN_EMAIL:}
+  # Valor inicial: o admin pode mudar pela tela de configurações.
+  registration-enabled: true
   cors:
     # Lista separada por vírgulas. O padrão é o ng serve do Angular.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
 market:
+  # Valores iniciais: o admin pode mudar pela tela de configurações.
+  collection-enabled: true
+  manual-refresh-seconds: 60
   # Para trocar de provedor, basta alterar estas propriedades. Vazio desliga a coleta do grupo.
   provider:
     crypto: ${MARKET_PROVIDER_CRYPTO:binance}
@@ -56,9 +63,11 @@ market:
 # Com enabled=false, /api/predictions deixa de existir e o restante do sistema não muda.
 predictive:
   enabled: ${PREDICTIVE_ENABLED:true}
-  # Abaixo disso, o retorno observado não é confiável e valem as premissas de referência.
-  min-history-days: 90
-  # Limites do retorno anual observado: pouco histórico anualizado gera valores absurdos.
+  # Os valores abaixo são iniciais: o admin pode mudar quase todos pela tela de configurações.
+  # Um ativo com menos dias de cotações não é medido e usa as premissas de referência.
+  # Abaixo de 90 porque a carga de 3 meses da Brapi pode ficar perto desse limite.
+  min-history-days: 60
+  # Limites do retorno anual medido: pouco histórico anualizado gera valores absurdos.
   min-observed-return: -0.5
   max-observed-return: 1.0
   # z de uma distribuição normal para o intervalo de confiança de 80%.

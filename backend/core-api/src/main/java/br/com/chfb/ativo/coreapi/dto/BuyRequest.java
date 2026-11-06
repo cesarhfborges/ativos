@@ -35,7 +35,7 @@ public record BuyRequest(
         @Schema(example = "100.00")
         @NotNull
         @Positive
-        @Digits(integer = 14, fraction = 4)
+        @Digits(integer = 16, fraction = 8)
         BigDecimal unitPrice,
 
         @Schema(example = "1.50", description = "Sem valor, a taxa é zero.")
@@ -45,9 +45,20 @@ public record BuyRequest(
 
         @Schema(description = "Quando a operação aconteceu. Sem valor, é agora.")
         @PastOrPresent(message = "A data da operação não pode estar no futuro")
-        Instant executedAt) {
+        Instant executedAt,
+
+        @Schema(description = "Cadastra o ativo mesmo que o provedor de cotações não o encontre.")
+        Boolean acceptUnverified) {
 
     public BuyOrder toOrder() {
-        return new BuyOrder(symbol, name, assetType, quantity, unitPrice, fee == null ? BigDecimal.ZERO : fee, executedAt);
+        return new BuyOrder(
+                symbol,
+                name,
+                assetType,
+                quantity,
+                unitPrice,
+                fee == null ? BigDecimal.ZERO : fee,
+                executedAt,
+                Boolean.TRUE.equals(acceptUnverified));
     }
 }

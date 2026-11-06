@@ -1,6 +1,10 @@
 package br.com.chfb.ativo.markettracker.provider;
 
+import br.com.chfb.ativo.sharedkernel.market.AssetCandidate;
+import br.com.chfb.ativo.sharedkernel.market.AssetSearchResult;
 import br.com.chfb.ativo.sharedkernel.market.PricePoint;
+import br.com.chfb.ativo.sharedkernel.market.SymbolCheck;
+import br.com.chfb.ativo.sharedkernel.portfolio.AssetClass;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -107,6 +111,66 @@ public class BrapiMarketProvider implements StockMarketProvider {
             }
         }
         return prices;
+    }
+
+    /** Sem token, a Brapi responde 401 até para ações reais: só o 404 diz que o símbolo não existe. */
+    @Override
+    public SymbolCheck checkStockSymbol(String symbol) {
+        try {
+            QuoteResponse response = restClient.get()
+                    .uri(baseUrl + "/api/quote/{symbol}", symbol)
+                    .headers(headers -> {
+                        if (!token.isBlank()) {
+                            headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+                        }
+                    })
+                    .retrieve()
+                    .body(QuoteResponse.class);
+            return response != null && response.results() != null && !response.results().isEmpty()
+                    ? SymbolCheck.FOUND
+                    : SymbolCheck.NOT_FOUND;
+        } catch (HttpClientErrorException.NotFound e) {
+            return SymbolCheck.NOT_FOUND;
+        } catch (RestClientException e) {
+            log.warn("Brapi não conferiu {}: {}", symbol, e.getMessage());
+            return SymbolCheck.UNAVAILABLE;
+        }
+    }
+
+    /** A listagem da Brapi responde sem token e já traz nome e último preço, sem uma chamada por ativo. */
+    @Override
+    public AssetSearchResult searchStocks(String query, int limit) {
+        try {
+            ListResponse response = restClient.get()
+                    .uri(baseUrl + "/api/quote/list?search={query}&limit={limit}", query, limit)
+                    .headers(headers -> {
+                        if (!token.isBlank()) {
+                            headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+                        }
+                    })
+                    .retrieve()
+                    .body(ListResponse.class);
+            if (response == null || response.stocks() == null) {
+                return AssetSearchResult.found(List.of());
+            }
+            return AssetSearchResult.found(response.stocks().stream()
+                    .filter(listed -> listed.stock() != null)
+                    .map(listed -> new AssetCandidate(
+                            listed.stock(),
+                            listed.name() == null || listed.name().isBlank() ? listed.stock() : listed.name(),
+                            AssetClass.STOCK,
+                            listed.close()))
+                    .toList());
+        } catch (RestClientException e) {
+            log.warn("Brapi não buscou ativos: {}", e.getMessage());
+            return AssetSearchResult.unavailable();
+        }
+    }
+
+    private record ListResponse(List<ListedStock> stocks) {
+    }
+
+    private record ListedStock(String stock, String name, BigDecimal close) {
     }
 
     private record HistoryResponse(List<HistoryResult> results) {

@@ -1,7 +1,9 @@
 package br.com.chfb.ativo.coreapi.exception;
 
+import br.com.chfb.ativo.assetmanagement.exception.AssetNotFoundException;
 import br.com.chfb.ativo.assetmanagement.exception.AssetTypeConflictException;
 import br.com.chfb.ativo.assetmanagement.exception.BusinessRuleException;
+import br.com.chfb.ativo.assetmanagement.exception.SymbolNotFoundException;
 import br.com.chfb.ativo.assetmanagement.exception.TransactionNotFoundException;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,25 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(EmailAlreadyInUseException.class)
     public ProblemDetail handleEmailAlreadyInUse(EmailAlreadyInUseException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(RegistrationClosedException.class)
+    public ProblemDetail handleRegistrationClosed(RegistrationClosedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+    }
+
+    /** Sem o símbolo no provedor: a tela pode pedir confirmação e sugerir o tipo em que ele existe. */
+    @ExceptionHandler(SymbolNotFoundException.class)
+    public ProblemDetail handleSymbolNotFound(SymbolNotFoundException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        problem.setProperty("code", "SYMBOL_NOT_FOUND");
+        problem.setProperty("suggestedType", e.getSuggestedType());
+        return problem;
+    }
+
+    @ExceptionHandler({AdminNotFoundException.class, AssetNotFoundException.class})
+    public ProblemDetail handleAdminNotFound(RuntimeException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(InvalidCurrentPasswordException.class)

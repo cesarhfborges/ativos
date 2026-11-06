@@ -24,6 +24,7 @@ public class OpenApiConfig {
     public static final String ASSET_TAG = "Ativos";
     public static final String DASHBOARD_TAG = "Dashboard";
     public static final String PREDICTION_TAG = "Projeções";
+    public static final String ADMIN_TAG = "Administração";
     public static final String SESSION_SCHEME = "session";
 
     private static final String DESCRIPTION = """

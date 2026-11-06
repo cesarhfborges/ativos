@@ -6,13 +6,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.chfb.ativo.assetmanagement.service.AssetCatalogService;
 import br.com.chfb.ativo.assetmanagement.service.DashboardService;
 import br.com.chfb.ativo.assetmanagement.service.MarketOverviewService;
 import br.com.chfb.ativo.assetmanagement.service.WalletService;
 import br.com.chfb.ativo.markettracker.service.QuoteCollector;
+import br.com.chfb.ativo.sharedkernel.market.AssetSearch;
 import br.com.chfb.ativo.predictiveengine.service.PredictionService;
 import br.com.chfb.ativo.coreapi.service.AuthService;
 import br.com.chfb.ativo.coreapi.service.ProfileService;
+import br.com.chfb.ativo.coreapi.service.admin.AdminAuditService;
+import br.com.chfb.ativo.coreapi.service.admin.AdminOperationsService;
+import br.com.chfb.ativo.coreapi.service.admin.AdminUserService;
+import br.com.chfb.ativo.coreapi.service.admin.AppSettingsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -52,6 +58,24 @@ class SecurityConfigTest {
 
     @MockitoBean
     private AuthenticationManager authenticationManager;
+
+    @MockitoBean
+    private AdminUserService adminUserService;
+
+    @MockitoBean
+    private AdminOperationsService adminOperationsService;
+
+    @MockitoBean
+    private AppSettingsService appSettingsService;
+
+    @MockitoBean
+    private AdminAuditService adminAuditService;
+
+    @MockitoBean
+    private AssetCatalogService assetCatalogService;
+
+    @MockitoBean
+    private AssetSearch assetSearch;
 
     @Test
     void rotaProtegidaRetorna401SemRedirecionar() throws Exception {

@@ -1,38 +1,37 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { catchError, debounceTime, EMPTY, skip, Subject, switchMap, tap } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { MessageModule } from 'primeng/message';
-import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
-import { Transaction, TransactionType } from '@/app/core/api.models';
+import { SimplePage, Transaction, TransactionType } from '@/app/core/api.models';
 import { errorMessage } from '@/app/core/api-error';
+import { defaultStatementFilter, hasActiveFilter, isValidFilter, StatementFilter } from '@/app/core/statement-filter';
 import { TRANSACTION_DISPLAY } from '@/app/core/transaction-display';
 import { TransactionReversalService } from '@/app/core/transaction-reversal.service';
 import { WalletService } from '@/app/core/wallet.service';
 import { ProfitLoss } from '@/app/shared/profit-loss';
+import { StatementFilters } from './components/statement-filters';
 
 const PAGE_SIZE = 20;
+const FILTER_DELAY_MS = 300;
 
 @Component({
     selector: 'app-statement',
-    imports: [FormsModule, ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, MessageModule, ProfitLoss, SelectModule, TableModule],
+    imports: [ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, MessageModule, ProfitLoss, StatementFilters, TableModule],
     template: `
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <h1 class="text-3xl! font-semibold m-0!">Extrato</h1>
-            <div class="flex items-center gap-2">
-                <span id="statement-filter-label" class="font-medium">Tipo</span>
-                <p-select ariaLabelledBy="statement-filter-label" optionLabel="label" optionValue="value" class="w-44" [options]="filterOptions" [ngModel]="filter()" (ngModelChange)="applyFilter($event)" />
-            </div>
-        </div>
+        <h1 class="text-3xl! font-semibold mt-0! mb-6!">Extrato</h1>
+
+        <app-statement-filters [(filter)]="filter" />
 
         <div class="card">
             @if (failure(); as message) {
                 <p-message severity="error" [text]="message" styleClass="mb-4" />
-                <p-button label="Tentar novamente" icon="pi pi-refresh" [loading]="loading()" (onClick)="load(page())" />
+                <p-button label="Tentar novamente" icon="pi pi-refresh" [loading]="loading()" (onClick)="load(currentPage())" />
             } @else {
                 <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Lançamentos do extrato">
-                    <p-table class="block min-w-[60rem]" [value]="transactions()" dataKey="id" [loading]="loading()">
+                    <p-table class="block min-w-[60rem]" [value]="result()?.data ?? []" dataKey="id" [loading]="loading()">
                         <ng-template #header>
                             <tr>
                                 <th scope="col">Data</th>
@@ -55,7 +54,7 @@ const PAGE_SIZE = 20;
                                     {{ transaction.quantity | number: '1.0-8' }}
                                 </td>
                                 <td class="text-right">
-                                    {{ transaction.unitPrice | currency: 'BRL' : 'symbol' : '1.2-4' }}
+                                    {{ transaction.unitPrice | currency: 'BRL' : 'symbol' : '1.2-8' }}
                                 </td>
                                 <td class="text-right">{{ transaction.fee | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
                                 <td class="text-right font-medium whitespace-nowrap" [class.line-through]="transaction.reversedAt">{{ transaction.totalAmount | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
@@ -85,68 +84,89 @@ const PAGE_SIZE = 20;
                         </ng-template>
                         <ng-template #emptymessage>
                             <tr>
-                                <td colspan="9" class="text-center text-muted-color py-8">{{ page() === 0 ? 'Nenhum lançamento registrado ainda.' : 'Não há mais lançamentos.' }}</td>
+                                <td colspan="9" class="text-center text-muted-color py-8">{{ emptyMessage() }}</td>
                             </tr>
                         </ng-template>
                     </p-table>
                 </div>
 
                 <nav class="flex items-center justify-end gap-4 mt-4" aria-label="Paginação do extrato">
-                    <p-button label="Anterior" icon="pi pi-angle-left" severity="secondary" [text]="true" [disabled]="page() === 0 || loading()" (onClick)="load(page() - 1)" />
-                    <span aria-live="polite">Página {{ page() + 1 }}</span>
-                    <p-button label="Próxima" icon="pi pi-angle-right" iconPos="right" severity="secondary" [text]="true" [disabled]="!hasNext() || loading()" (onClick)="load(page() + 1)" />
+                    <p-button label="Anterior" icon="pi pi-angle-left" severity="secondary" [text]="true" [disabled]="!result()?.prev_page_url || loading()" (onClick)="load(currentPage() - 1)" />
+                    <span aria-live="polite">{{ pageLabel() }}</span>
+                    <p-button label="Próxima" icon="pi pi-angle-right" iconPos="right" severity="secondary" [text]="true" [disabled]="!result()?.next_page_url || loading()" (onClick)="load(currentPage() + 1)" />
                 </nav>
             }
         </div>
     `
 })
-export class Statement implements OnInit {
+export class Statement {
     private readonly wallet = inject(WalletService);
     private readonly reversal = inject(TransactionReversalService);
 
-    protected readonly filterOptions: { label: string; value: TransactionType | null }[] = [
-        { label: 'Todos', value: null },
-        ...(Object.keys(TRANSACTION_DISPLAY) as TransactionType[]).map((value) => ({ label: TRANSACTION_DISPLAY[value].label, value }))
-    ];
-    protected readonly filter = signal<TransactionType | null>(null);
-    protected readonly transactions = signal<Transaction[]>([]);
-    protected readonly page = signal(0);
+    protected readonly filter = signal<StatementFilter>(defaultStatementFilter(new Date()));
+    protected readonly result = signal<SimplePage<Transaction> | null>(null);
     protected readonly loading = signal(true);
     protected readonly failure = signal<string | null>(null);
 
-    /** A API não informa o total: uma página cheia indica que pode haver mais lançamentos. */
-    protected readonly hasNext = computed(() => this.transactions().length === PAGE_SIZE);
+    protected readonly currentPage = computed(() => this.result()?.current_page ?? 1);
 
-    ngOnInit(): void {
-        this.load(0);
+    protected readonly pageLabel = computed(() => {
+        const page = this.result();
+        return page?.from ? `Página ${page.current_page} · ${page.from} a ${page.to}` : `Página ${this.currentPage()}`;
+    });
+
+    protected readonly emptyMessage = computed(() => (hasActiveFilter(this.filter()) ? 'Nenhum lançamento para esses filtros.' : 'Nenhum lançamento registrado ainda.'));
+
+    private readonly requests = new Subject<number>();
+
+    constructor() {
+        // switchMap descarta a resposta de um filtro anterior, que poderia chegar depois da do atual.
+        this.requests
+            .pipe(
+                tap(() => this.loading.set(true)),
+                switchMap((page) =>
+                    this.wallet.statement(this.filter(), page, PAGE_SIZE).pipe(
+                        catchError((error: unknown) => {
+                            this.failure.set(errorMessage(error));
+                            this.loading.set(false);
+                            return EMPTY;
+                        })
+                    )
+                ),
+                takeUntilDestroyed()
+            )
+            .subscribe((page) => this.show(page));
+
+        // A espera junta os ajustes seguidos, como digitar um valor, em uma só requisição.
+        toObservable(this.filter)
+            .pipe(skip(1), debounceTime(FILTER_DELAY_MS), takeUntilDestroyed())
+            .subscribe(() => this.load(1));
+
+        this.load(1);
     }
 
     protected load(page: number): void {
-        this.loading.set(true);
-        this.wallet.statement(page, PAGE_SIZE, this.filter()).subscribe({
-            next: (transactions) => {
-                this.transactions.set(transactions);
-                this.page.set(page);
-                this.failure.set(null);
-                this.loading.set(false);
-            },
-            error: (error: unknown) => {
-                this.failure.set(errorMessage(error));
-                this.loading.set(false);
-            }
-        });
+        if (isValidFilter(this.filter())) {
+            this.requests.next(page);
+        }
     }
 
     protected reverse(transaction: Transaction): void {
-        this.reversal.reverse(transaction, () => this.load(this.page()));
-    }
-
-    protected applyFilter(type: TransactionType | null): void {
-        this.filter.set(type);
-        this.load(0);
+        this.reversal.reverse(transaction, () => this.load(this.currentPage()));
     }
 
     protected display(type: TransactionType) {
         return TRANSACTION_DISPLAY[type];
+    }
+
+    /** Filtrando por "Válidas", estornar o único lançamento da última página a deixa vazia. */
+    private show(page: SimplePage<Transaction>): void {
+        if (page.data.length === 0 && page.current_page > 1) {
+            this.load(page.current_page - 1);
+            return;
+        }
+        this.result.set(page);
+        this.failure.set(null);
+        this.loading.set(false);
     }
 }

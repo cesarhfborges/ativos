@@ -134,7 +134,7 @@ type TypeFilter = AssetType | 'ALL';
                             </td>
                             <td class="text-right" data-label="% carteira">
                                 <div class="tabular-nums">{{ row.share | number: '1.1-1' }}%</div>
-                                <div class="h-1 mt-1 ml-auto w-16 rounded-sm bg-surface-200 dark:bg-surface-700" aria-hidden="true">
+                                <div class="h-1 mt-1.5 ml-auto w-16 rounded-sm bg-surface-200 dark:bg-surface-700" aria-hidden="true">
                                     <div class="h-full rounded-sm bg-blue-600 dark:bg-blue-400" [style.width.%]="row.share"></div>
                                 </div>
                             </td>

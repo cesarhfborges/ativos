@@ -11,6 +11,19 @@ p-chart {
     min-width: 0;
 }
 
+/*
+ * O alinhamento das células do PrimeNG vence as classes do Tailwind, que ficam em uma camada: sem isto, um valor
+ * numérico fica à esquerda e o título da coluna, à direita. O modo em blocos tem regras próprias, mais específicas.
+ */
+.p-datatable-tbody > tr > td.text-right,
+.p-datatable-tfoot > tr > td.text-right {
+    text-align: right;
+}
+
+.p-datatable-tbody > tr > td.text-center {
+    text-align: center;
+}
+
 /* O vermelho do tema não atinge o contraste AA como texto sobre a superfície. */
 .p-button-danger.p-button-text {
     color: var(--p-red-700) !important;

@@ -11,6 +11,7 @@ import br.com.chfb.ativo.assetmanagement.repository.WalletTransactionRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -86,6 +87,24 @@ public class DashboardService {
                         wallet.getId(),
                         snapshotRepository.findByWalletIdAndSnapshotTimeGreaterThanEqualOrderBySnapshotTime(wallet.getId(), from)))
                 .orElseGet(List::of);
+    }
+
+    /**
+     * O histórico seguido do valor de agora, calculado como no resumo. Os pontos gravados são de hora cheia: sem este,
+     * o gráfico contradiria o resumo depois de uma operação ou de uma atualização de cotações, até a coleta seguinte.
+     */
+    @Transactional(readOnly = true)
+    public List<PortfolioHistoryPoint> historyUntilNow(UUID userId, int days) {
+        List<PortfolioHistoryPoint> points = new ArrayList<>(history(userId, days));
+        List<DashboardPositionResponse> positions = positions(userId);
+        // Sem posição aberta não há ponto, como na geração dos snapshots.
+        if (!positions.isEmpty()) {
+            points.add(new PortfolioHistoryPoint(
+                    Instant.now(),
+                    sum(positions, DashboardPositionResponse::investedValue),
+                    sum(positions, DashboardPositionResponse::marketValue)));
+        }
+        return points;
     }
 
     private static BigDecimal sum(

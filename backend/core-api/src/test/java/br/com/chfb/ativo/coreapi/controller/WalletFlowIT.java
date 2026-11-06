@@ -274,10 +274,29 @@ class WalletFlowIT {
 
         JsonNode history = read(user.get("/api/dashboard/history"));
 
-        assertThat(history).hasSize(3);
+        assertThat(history).hasSize(4);
         assertPoint(history.get(0), before, "100", "123");
         assertPoint(history.get(1), during, "100", "110");
         assertPoint(history.get(2), after, "100", "777");
+        assertBalances(history.get(3), "100", "100");
+    }
+
+    @Test
+    void historicoTerminaNoValorAtualMesmoComOperacaoDepoisDoUltimoPonto() throws Exception {
+        LoggedUser user = new LoggedUser();
+        user.buy(uniqueSymbol(), "1", "100", "0");
+        Instant recorded = snapshot(user, "100", "100");
+        user.buy(uniqueSymbol(), "2", "50", "0");
+
+        JsonNode history = read(user.get("/api/dashboard/history"));
+        JsonNode overview = read(user.get("/api/dashboard/overview"));
+
+        assertThat(history).hasSize(2);
+        assertPoint(history.get(0), recorded, "100", "100");
+        assertBalances(history.get(1), "200", "200");
+        assertThat(Instant.parse(history.get(1).at("/time").asText())).isAfter(recorded);
+        assertThat(overview.at("/investedValue").decimalValue()).isEqualByComparingTo("200");
+        assertThat(overview.at("/marketValue").decimalValue()).isEqualByComparingTo("200");
     }
 
     @Test
@@ -305,8 +324,9 @@ class WalletFlowIT {
 
         JsonNode history = read(user.get("/api/dashboard/history"));
 
-        assertThat(history).hasSize(1);
+        assertThat(history).hasSize(2);
         assertPoint(history.get(0), time, "200", "260");
+        assertBalances(history.get(1), "200", "200");
     }
 
     @Test
@@ -320,8 +340,9 @@ class WalletFlowIT {
 
         JsonNode history = read(user.get("/api/dashboard/history"));
 
-        assertThat(history).hasSize(1);
+        assertThat(history).hasSize(2);
         assertPoint(history.get(0), time, "82", "82");
+        assertBalances(history.get(1), "82", "82");
     }
 
     private Instant snapshot(LoggedUser user, String invested, String total) {
@@ -352,6 +373,10 @@ class WalletFlowIT {
 
     private static void assertPoint(JsonNode point, Instant time, String invested, String total) {
         assertThat(Instant.parse(point.at("/time").asText())).isCloseTo(time, within(1, ChronoUnit.MILLIS));
+        assertBalances(point, invested, total);
+    }
+
+    private static void assertBalances(JsonNode point, String invested, String total) {
         assertThat(point.at("/investedBalance").decimalValue()).isEqualByComparingTo(invested);
         assertThat(point.at("/totalBalance").decimalValue()).isEqualByComparingTo(total);
     }

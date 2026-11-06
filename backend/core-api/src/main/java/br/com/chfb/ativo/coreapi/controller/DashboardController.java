@@ -58,14 +58,14 @@ public class DashboardController {
     }
 
     @Operation(summary = "Retorna a evolução patrimonial, a partir dos snapshots dos últimos dias")
-    @ApiResponse(responseCode = "200", description = "Pontos do histórico, do mais antigo ao mais recente")
+    @ApiResponse(responseCode = "200", description = "Pontos do histórico, do mais antigo ao mais recente. Com posição aberta, o último é o valor de agora")
     @ApiResponse(responseCode = "400", description = "Período inválido", content = @Content)
     @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada", content = @Content)
     @GetMapping("/history")
     public List<PortfolioHistoryPoint> history(
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days) {
-        return dashboardService.history(user.getId(), days);
+        return dashboardService.historyUntilNow(user.getId(), days);
     }
 
     @Operation(summary = "Retorna o comportamento de mercado dos ativos em carteira: variação, faixa e preços do período")

@@ -394,6 +394,8 @@ O estorno é recusado (`422`) se uma venda posterior ficaria sem quantidade: nes
 
 Os snapshots antigos não são reescritos, mas `GET /api/dashboard/history` não conta o que foi estornado: os pontos gravados entre o lançamento e o estorno de uma operação são recalculados na leitura, só com as operações válidas lançadas até ali e o preço daquele instante (ou o custo, se não havia preço). Um ponto sem nenhuma posição restante sai do histórico. Assim, a evolução patrimonial, o retorno e as projeções ignoram os estornos, inclusive os antigos. Lançamentos retroativos continuam sem alterar os pontos anteriores a eles.
 
+Com posição aberta, a resposta de `GET /api/dashboard/history` termina com um ponto calculado na hora, igual ao resumo do Painel, e que não é gravado. Sem ele, uma operação ou atualização de cotações só apareceria no gráfico na coleta seguinte. As projeções continuam usando só os pontos gravados.
+
 ## Projeções
 
 `POST /api/predictions/simulate` recebe `months` (6, 12, 24 ou 60), `monthlyContribution` e `scenario` (`OPTIMISTIC`, `REALISTIC` ou `PESSIMISTIC`) e devolve a curva com intervalo de confiança de 80%, as premissas e os alertas de risco.

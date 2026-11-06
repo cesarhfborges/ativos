@@ -1,3 +1,4 @@
+import { differenceInHours, parseISO } from 'date-fns';
 import { DashboardPosition, MarketAsset, PortfolioHistoryPoint, PricePoint } from './api.models';
 
 /** Períodos de análise oferecidos nas telas de mercado. */
@@ -21,6 +22,8 @@ export interface Mover {
 export interface RankedItem {
     label: string;
     value: number;
+    /** Ressalva sobre o valor, como um período menor que o escolhido. */
+    note?: string;
 }
 
 export interface AlignedSeries {
@@ -32,6 +35,9 @@ export interface AlignedSeries {
 const OTHERS_LABEL = 'Outros';
 const MAX_DAYS_WITH_TIME = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** O que pode faltar sem mudar o que o período mede: 10% dele ou o suficiente para um feriado prolongado, o que for maior. */
+const PERIOD_TOLERANCE_SHARE = 0.1;
+const PERIOD_TOLERANCE_DAYS = 5;
 
 /** Formato das datas do eixo: em períodos longos, a hora só tira o espaço de que o rótulo precisa. */
 export function axisDateFormat(times: string[]): string {
@@ -90,9 +96,32 @@ export function resultByAsset(positions: DashboardPosition[]): RankedItem[] {
         .sort((a, b) => b.value - a.value);
 }
 
-/** Variação de cada ativo no período, da maior alta à maior queda. */
-export function periodChanges(market: MarketAsset[]): RankedItem[] {
-    return market.flatMap((asset) => (asset.periodChangePercent === null ? [] : [{ label: asset.symbol, value: asset.periodChangePercent }])).sort((a, b) => b.value - a.value);
+/**
+ * Quantos dias os preços cobrem, quando é bem menos que o período pedido: 3 meses de histórico não são "1 ano".
+ * Nulo quando cobrem o período ou quando não há pontos para medir.
+ */
+export function shortHistoryDays(prices: PricePoint[], days: number): number | null {
+    if (prices.length < 2) {
+        return null;
+    }
+    const covered = differenceInHours(parseISO(prices[prices.length - 1].time), parseISO(prices[0].time)) / 24;
+    return covered < days - Math.max(days * PERIOD_TOLERANCE_SHARE, PERIOD_TOLERANCE_DAYS) ? Math.round(covered) : null;
+}
+
+/** O período real de uma variação, ou nulo quando ela vale para o período pedido. */
+export function shortHistoryNote(prices: PricePoint[], days: number): string | null {
+    const covered = shortHistoryDays(prices, days);
+    return covered === null ? null : `em ${covered} ${covered === 1 ? 'dia' : 'dias'}`;
+}
+
+/** Variação de cada ativo no período, da maior alta à maior queda, avisando quem só tem parte do período. */
+export function periodChanges(market: MarketAsset[], days: number): RankedItem[] {
+    return market
+        .flatMap((asset) => {
+            const note = shortHistoryNote(asset.prices, days);
+            return asset.periodChangePercent === null ? [] : [{ label: asset.symbol, value: asset.periodChangePercent, ...(note ? { note } : {}) }];
+        })
+        .sort((a, b) => b.value - a.value);
 }
 
 /** Retorno das posições abertas em cada ponto: compras e vendas mudam o patrimônio, mas não este número por si só. */

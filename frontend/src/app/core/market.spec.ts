@@ -1,8 +1,14 @@
 import { DashboardPosition, MarketAsset } from './api.models';
-import { alignIndexed, axisDateFormat, composition, movers24h, periodChanges, portfolioChange24h, resultByAsset, returnSeries } from './market';
+import { alignIndexed, axisDateFormat, composition, movers24h, periodChanges, portfolioChange24h, resultByAsset, returnSeries, shortHistoryDays, shortHistoryNote } from './market';
 
 const position = (symbol: string, marketValue: number, profitLoss = 0, currentPrice: number | null = 1) => ({ symbol, marketValue, profitLoss, currentPrice }) as DashboardPosition;
 const asset = (symbol: string, change24hPercent: number | null, periodChangePercent: number | null = null) => ({ symbol, change24hPercent, periodChangePercent, periodLow: null, periodHigh: null, prices: [] }) as MarketAsset;
+
+/** Dois preços separados por esse número de dias. */
+const span = (days: number) => [
+    { time: new Date(Date.UTC(2026, 0, 1)).toISOString(), price: 10 },
+    { time: new Date(Date.UTC(2026, 0, 1 + days)).toISOString(), price: 10 }
+];
 
 describe('market', () => {
     it('calcula a variação da carteira em 24 horas ponderada pelo valor, sem os ativos sem referência', () => {
@@ -46,7 +52,31 @@ describe('market', () => {
     });
 
     it('ordena a variação do período e ignora quem não tem dados', () => {
-        expect(periodChanges([asset('A', null, -3), asset('B', null, 8), asset('C', null, null)]).map((item) => item.label)).toEqual(['B', 'A']);
+        expect(periodChanges([asset('A', null, -3), asset('B', null, 8), asset('C', null, null)], 30).map((item) => item.label)).toEqual(['B', 'A']);
+    });
+
+    it('avisa o período real de quem só tem parte do histórico', () => {
+        const year = { ...asset('XRP', null, -47), prices: span(364) };
+        const months = { ...asset('BBSE3', null, -1), prices: span(88) };
+        expect(periodChanges([year, months], 365)).toEqual([
+            { label: 'BBSE3', value: -1, note: 'em 88 dias' },
+            { label: 'XRP', value: -47 }
+        ]);
+    });
+
+    it('mede o histórico curto com a tolerância do período', () => {
+        expect(shortHistoryDays(span(88), 365)).toBe(88);
+        expect(shortHistoryDays(span(88), 90)).toBeNull();
+        // Em 7 dias, um fim de semana no início deixa só 5 dias de pregão, e isso ainda é o período.
+        expect(shortHistoryDays(span(5), 7)).toBeNull();
+        expect(shortHistoryDays(span(1), 7)).toBe(1);
+        expect(shortHistoryDays([], 365)).toBeNull();
+    });
+
+    it('escreve o período no singular e no plural', () => {
+        expect(shortHistoryNote(span(1), 7)).toBe('em 1 dia');
+        expect(shortHistoryNote(span(20), 90)).toBe('em 20 dias');
+        expect(shortHistoryNote(span(90), 90)).toBeNull();
     });
 
     it('calcula o retorno sobre o investido e ignora pontos sem posição', () => {

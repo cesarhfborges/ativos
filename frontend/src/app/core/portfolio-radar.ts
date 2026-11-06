@@ -1,4 +1,5 @@
 import { DashboardPosition, MarketAsset, WatchlistItem } from './api.models';
+import { shortHistoryDays } from './market';
 
 export interface RadarAxis {
     key: string;
@@ -14,7 +15,11 @@ export interface RadarAxis {
 /** Com esse número de ativos de mesmo peso, a diversificação já é considerada completa. */
 const FULL_DIVERSIFICATION_ASSETS = 10;
 const RETURN_RANGE = 50;
-const MOMENTUM_RANGE = 20;
+/** Os extremos do Momento em 30 dias. Variações crescem com a raiz do tempo, então a escala acompanha o período. */
+const MOMENTUM_RANGE_30_DAYS = 20;
+const MOMENTUM_REFERENCE_DAYS = 30;
+/** Abaixo disso, a nota falaria de poucos ativos como se fosse a carteira inteira. */
+const MIN_VALUE_COVERAGE = 0.5;
 const FULL_VOLATILITY = 100;
 /** Com menos variações que isso, o desvio-padrão diz pouco. */
 const MIN_RETURNS = 5;
@@ -52,15 +57,17 @@ function weightedAverage(values: { weight: number; value: number | null }[]): nu
 }
 
 function diversification(positions: DashboardPosition[]): RadarAxis {
-    const base = { key: 'diversification', label: 'Diversificação', hint: 'Quanto o patrimônio está dividido entre os ativos, considerando o peso de cada um.' };
+    const base = { key: 'diversification', label: 'Diversificação', hint: 'Quanto a divisão do patrimônio reduz o risco de depender de um só ativo. Cada ativo novo ajuda menos que o anterior, e 10 de mesmo peso é a nota máxima.' };
     const total = positions.reduce((sum, position) => sum + position.marketValue, 0);
     if (total <= 0) {
         return { ...base, score: null, detail: NO_DATA };
     }
-    const effective = 1 / positions.reduce((sum, position) => sum + (position.marketValue / total) ** 2, 0);
+    const concentration = positions.reduce((sum, position) => sum + (position.marketValue / total) ** 2, 0);
+    const effective = 1 / concentration;
     return {
         ...base,
-        score: clamp(((effective - 1) / (FULL_DIVERSIFICATION_ASSETS - 1)) * 100),
+        // O risco específico da carteira é proporcional à concentração: cada ativo novo elimina menos que o anterior.
+        score: clamp(((1 - concentration) / (1 - 1 / FULL_DIVERSIFICATION_ASSETS)) * 100),
         detail: `Equivale a ${number(effective)} ${effective < 1.05 ? 'ativo' : 'ativos'} de mesmo peso`
     };
 }
@@ -76,10 +83,23 @@ function profitability(positions: DashboardPosition[]): RadarAxis {
     return { ...base, score: centered(percent, RETURN_RANGE), detail: `${signed(percent)} sobre o custo` };
 }
 
-function momentum(positions: DashboardPosition[], market: Map<string, MarketAsset>, periodLabel: string): RadarAxis {
-    const base = { key: 'momentum', label: 'Momento', hint: `Variação dos preços em ${periodLabel}, ponderada pelo valor de cada posição. Zero fica na metade da escala.` };
-    const percent = weightedAverage(positions.map((position) => ({ weight: position.marketValue, value: market.get(position.symbol)?.periodChangePercent ?? null })));
-    return percent === null ? { ...base, score: null, detail: NO_DATA } : { ...base, score: centered(percent, MOMENTUM_RANGE), detail: `${signed(percent)} em ${periodLabel}` };
+/** Sem isso, a média mediria outro período: 3 meses de uma ação não podem somar com 1 ano de uma moeda. */
+function coversPeriod(asset: MarketAsset | undefined, days: number): boolean {
+    return !!asset && asset.prices.length >= 2 && shortHistoryDays(asset.prices, days) === null;
+}
+
+function momentum(positions: DashboardPosition[], market: Map<string, MarketAsset>, days: number, periodLabel: string): RadarAxis {
+    const range = MOMENTUM_RANGE_30_DAYS * Math.sqrt(days / MOMENTUM_REFERENCE_DAYS);
+    const base = { key: 'momentum', label: 'Momento', hint: `Variação dos preços em ${periodLabel}, ponderada pelo valor, só com ativos que têm preços de quase todo o período. Zero fica na metade da escala, e os extremos são −${number(range, 0)}% e +${number(range, 0)}%.` };
+    const measured = positions.filter((position) => coversPeriod(market.get(position.symbol), days) && market.get(position.symbol)?.periodChangePercent != null);
+    const total = positions.reduce((sum, position) => sum + position.marketValue, 0);
+    const measuredValue = measured.reduce((sum, position) => sum + position.marketValue, 0);
+    const percent = weightedAverage(measured.map((position) => ({ weight: position.marketValue, value: market.get(position.symbol)?.periodChangePercent ?? null })));
+    if (percent === null || measuredValue / total < MIN_VALUE_COVERAGE) {
+        return { ...base, score: null, detail: NO_DATA };
+    }
+    const partial = measured.length < positions.length ? `, em ${measured.length} de ${positions.length} posições` : '';
+    return { ...base, score: centered(percent, range), detail: `${signed(percent)} em ${periodLabel}${partial}` };
 }
 
 function stability(positions: DashboardPosition[], market: Map<string, MarketAsset>, periodLabel: string): RadarAxis {
@@ -109,7 +129,7 @@ function planning(positions: DashboardPosition[], watchlist: WatchlistItem[] | n
 }
 
 /** Notas descritivas da carteira, para comparar aspectos diferentes na mesma escala. Não são recomendação. */
-export function portfolioRadar(positions: DashboardPosition[], market: MarketAsset[], watchlist: WatchlistItem[] | null, periodLabel: string): RadarAxis[] {
+export function portfolioRadar(positions: DashboardPosition[], market: MarketAsset[], watchlist: WatchlistItem[] | null, days: number, periodLabel: string): RadarAxis[] {
     const bySymbol = new Map(market.map((asset) => [asset.symbol, asset]));
-    return [diversification(positions), profitability(positions), momentum(positions, bySymbol, periodLabel), stability(positions, bySymbol, periodLabel), winners(positions), planning(positions, watchlist)];
+    return [diversification(positions), profitability(positions), momentum(positions, bySymbol, days, periodLabel), stability(positions, bySymbol, periodLabel), winners(positions), planning(positions, watchlist)];
 }

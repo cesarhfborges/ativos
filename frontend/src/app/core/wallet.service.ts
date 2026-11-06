@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
-import { Asset, AssetLookup, AssetType, BuyRequest, DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, SellRequest, SimplePage, Transaction } from './api.models';
+import { Asset, AssetLookup, AssetType, BuyRequest, DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, PortfolioSentiment, SellRequest, SimplePage, Transaction } from './api.models';
 import { EMPTY_STATEMENT_FILTER, StatementFilter, statementParams } from './statement-filter';
 
 @Injectable({ providedIn: 'root' })
@@ -31,6 +31,10 @@ export class WalletService {
 
     market(days: number): Observable<MarketAsset[]> {
         return this.http.get<MarketAsset[]>('/api/dashboard/market', { params: { days } });
+    }
+
+    sentiment(days: number): Observable<PortfolioSentiment> {
+        return this.http.get<PortfolioSentiment>('/api/dashboard/sentiment', { params: { days } });
     }
 
     buy(body: BuyRequest): Observable<Transaction> {

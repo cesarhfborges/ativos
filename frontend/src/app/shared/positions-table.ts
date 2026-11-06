@@ -9,6 +9,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { TableModule } from 'primeng/table';
+import { shortHistoryNote } from '@/app/core/market';
 import { AssetType, DashboardPosition, MarketAsset, Position, WatchlistItem } from '@/app/core/api.models';
 import { PlanSummary } from '@/app/shared/plan-summary';
 import { PercentChange } from './percent-change';
@@ -105,6 +106,9 @@ type TypeFilter = AssetType | 'ALL';
                                     <div class="flex flex-col items-end gap-1">
                                         <app-sparkline [values]="row.trend" [label]="'Tendência de ' + row.symbol + ' em ' + periodLabel()" />
                                         <span class="text-sm"><app-percent-change [value]="row.periodChange" /></span>
+                                        @if (row.periodNote; as note) {
+                                            <span class="text-muted-color text-xs whitespace-nowrap">{{ note }}</span>
+                                        }
                                     </div>
                                 </td>
                                 <td class="stack-optional stack-full min-w-44" data-label="Mín. e máx.">
@@ -193,6 +197,7 @@ export class PositionsTable {
     readonly market = input<MarketAsset[] | null>(null);
     /** Período dos dados de mercado, como "30 dias". */
     readonly periodLabel = input('');
+    readonly days = input(0);
     readonly buy = output<Position>();
     readonly sell = output<Position>();
     readonly plan = output<DashboardPosition>();
@@ -224,6 +229,7 @@ export class PositionsTable {
                 stale: position.quoteUpdatedAt !== null && this.newestQuote() - Date.parse(position.quoteUpdatedAt) > STALE_AFTER_MS,
                 change24h: asset?.change24hPercent ?? null,
                 periodChange: asset?.periodChangePercent ?? null,
+                periodNote: asset && asset.periodChangePercent !== null ? shortHistoryNote(asset.prices, this.days()) : null,
                 periodLow: low,
                 periodHigh: high,
                 rangePosition: position.currentPrice !== null && low !== null && high !== null && high > low ? Math.min(100, Math.max(0, ((position.currentPrice - low) / (high - low)) * 100)) : null,

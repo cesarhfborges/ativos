@@ -17,7 +17,7 @@ import { TagModule } from 'primeng/tag';
 import { AssetCandidate, AssetType, Position, Transaction, WatchlistItem } from '@/app/core/api.models';
 import { errorMessage } from '@/app/core/api-error';
 import { ConfirmService } from '@/app/core/confirm.service';
-import { MARKET_PERIODS } from '@/app/core/market';
+import { MARKET_PERIODS, shortHistoryNote } from '@/app/core/market';
 import { signalReading } from '@/app/core/technical-signal';
 import { isHeld, reachedTargets } from '@/app/core/watchlist';
 import { WatchlistService } from '@/app/core/watchlist.service';
@@ -154,6 +154,9 @@ const TYPE_LABELS: Record<AssetType, string> = { STOCK: 'Ação', CRYPTO: 'Cript
                                             <div class="flex flex-col items-end gap-1">
                                                 <app-sparkline [values]="row.trend" [label]="'Tendência de ' + row.symbol + ' em ' + periodLabel()" />
                                                 <span class="text-sm"><app-percent-change [value]="row.periodChangePercent" /></span>
+                                                @if (row.periodNote; as note) {
+                                                    <span class="text-muted-color text-xs whitespace-nowrap">{{ note }}</span>
+                                                }
                                             </div>
                                         </td>
                                         @if (signalsEnabled()) {
@@ -295,7 +298,7 @@ export class Watchlist {
         const type = this.typeFilter();
         return (this.items() ?? [])
             .filter((item) => (type === 'ALL' || item.assetType === type) && (!term || item.symbol.toLocaleLowerCase('pt-BR').includes(term) || item.name.toLocaleLowerCase('pt-BR').includes(term)))
-            .map((item) => ({ ...item, trend: item.prices.map((point) => point.price), rsi: item.signal?.rsi ?? null, reading: item.signal ? signalReading(item.signal) : null }));
+            .map((item) => ({ ...item, trend: item.prices.map((point) => point.price), periodNote: item.periodChangePercent === null ? null : shortHistoryNote(item.prices, this.days()), rsi: item.signal?.rsi ?? null, reading: item.signal ? signalReading(item.signal) : null }));
     });
 
     /** Com o módulo de projeções desligado, nenhum item traz o sinal, e a coluna some. */

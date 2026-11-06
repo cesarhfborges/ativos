@@ -30,7 +30,12 @@ import { RankedItem } from '@/app/core/market';
                 <tbody>
                     @for (row of rows(); track row.label) {
                         <tr>
-                            <th scope="row" class="py-2 pr-3 w-16 text-left font-medium whitespace-nowrap">{{ row.label }}</th>
+                            <th scope="row" class="py-2 pr-3 w-16 text-left font-medium whitespace-nowrap">
+                                {{ row.label }}
+                                @if (row.note) {
+                                    <div class="text-muted-color text-xs font-normal">{{ row.note }}</div>
+                                }
+                            </th>
                             <td class="py-2" aria-hidden="true">
                                 <div class="relative h-2">
                                     @if (hasNegative()) {
@@ -71,6 +76,7 @@ export class RankedBars {
             const width = (Math.abs(item.value) / span) * 100;
             return {
                 label: item.label,
+                note: item.note ?? null,
                 text: format(item.value),
                 left: item.value < 0 ? zero - width : zero,
                 width,

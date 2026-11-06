@@ -4,7 +4,7 @@ import { ChartModule } from 'primeng/chart';
 import { ChartResize } from '@/app/shared/chart-resize';
 import { DashboardPosition, MarketAsset } from '@/app/core/api.models';
 import { chartTheme, MAX_LINE_SERIES } from '@/app/core/chart-theme';
-import { alignIndexed } from '@/app/core/market';
+import { alignIndexed, shortHistoryDays } from '@/app/core/market';
 import { LayoutService } from '@/app/layout/service/layout.service';
 import { PercentChange } from '@/app/shared/percent-change';
 
@@ -91,7 +91,12 @@ export class AssetPerformanceChart {
     protected readonly subtitle = computed(() => {
         const hidden = this.market().filter((asset) => asset.prices.length >= 2).length - this.selected().length;
         const base = `Preço de cada ativo, com todos valendo 100 no início do período de ${this.periodLabel()}.`;
-        return hidden > 0 ? `${base} Mostra as ${MAX_LINE_SERIES} maiores posições.` : base;
+        const short = this.selected().flatMap((asset) => {
+            const covered = shortHistoryDays(asset.prices, this.days());
+            return covered === null ? [] : [`${asset.symbol} (${covered} ${covered === 1 ? 'dia' : 'dias'})`];
+        });
+        const history = short.length > 0 ? ` Com menos histórico, parte de 100 no primeiro preço: ${short.join(', ')}.` : '';
+        return `${base}${history}${hidden > 0 ? ` Mostra as ${MAX_LINE_SERIES} maiores posições.` : ''}`;
     });
 
     protected readonly ariaDescription = computed(() => {

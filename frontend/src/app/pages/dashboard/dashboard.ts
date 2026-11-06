@@ -8,7 +8,7 @@ import { ButtonModule } from 'primeng/button';
 import { MessageModule } from 'primeng/message';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { SkeletonModule } from 'primeng/skeleton';
-import { DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, Transaction, WatchlistItem } from '@/app/core/api.models';
+import { DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, PortfolioSentiment, Transaction, WatchlistItem } from '@/app/core/api.models';
 import { errorMessage } from '@/app/core/api-error';
 import { composition, MARKET_PERIODS, periodChanges, resultByAsset } from '@/app/core/market';
 import { allocation } from '@/app/core/portfolio';
@@ -27,6 +27,7 @@ import { PortfolioRadarChart } from './components/portfolio-radar-chart';
 import { RankedBars } from './components/ranked-bars';
 import { ReachedTargets } from './components/reached-targets';
 import { ReturnChart } from './components/return-chart';
+import { SentimentChart } from './components/sentiment-chart';
 
 const RECENT_SIZE = 5;
 
@@ -55,6 +56,7 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
         ReturnChart,
         RouterLink,
         SelectButtonModule,
+        SentimentChart,
         SkeletonModule,
         StatCard
     ],
@@ -147,7 +149,7 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
                     <section class="col-span-12" aria-labelledby="positions-title">
                         <div class="card mb-0!">
                             <h2 id="positions-title" class="text-xl! font-semibold mt-0! mb-6!">Posições atuais</h2>
-                            <app-positions-table [positions]="positions()" [total]="data.marketValue" [market]="market()" [periodLabel]="periodLabel()" />
+                            <app-positions-table [positions]="positions()" [total]="data.marketValue" [market]="market()" [days]="days()" [periodLabel]="periodLabel()" />
                         </div>
                     </section>
 
@@ -161,6 +163,12 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
                     <section class="col-span-12">
                         <app-portfolio-radar-chart [axes]="radarAxes()" />
                     </section>
+
+                    @if (sentiment(); as data) {
+                        <section class="col-span-12">
+                            <app-sentiment-chart [sentiment]="data" />
+                        </section>
+                    }
 
                     <section class="col-span-12 xl:col-span-8">
                         <app-history-chart [points]="history()" />
@@ -205,6 +213,8 @@ export class Dashboard {
     /** Nulo sem resposta: é secundário, e o restante do painel continua útil sem ele. */
     protected readonly watchlist = signal<WatchlistItem[] | null>(null);
     protected readonly marketFailed = signal(false);
+    /** Nulo sem resposta, como com o módulo de projeções desligado: o card simplesmente não aparece. */
+    protected readonly sentiment = signal<PortfolioSentiment | null>(null);
     protected readonly periods = PERIODS;
     protected readonly days = signal(30);
     protected readonly periodLoading = signal(false);
@@ -213,10 +223,10 @@ export class Dashboard {
 
     protected readonly periodLabel = computed(() => PERIODS.find((period) => period.value === this.days())?.label ?? '');
     protected readonly slices = computed(() => allocation(this.positions()));
-    protected readonly changes = computed(() => periodChanges(this.market()));
+    protected readonly changes = computed(() => periodChanges(this.market(), this.days()));
     protected readonly assetShares = computed(() => composition(this.positions()));
     protected readonly results = computed(() => resultByAsset(this.positions()));
-    protected readonly radarAxes = computed(() => portfolioRadar(this.positions(), this.market(), this.watchlist(), this.periodLabel()));
+    protected readonly radarAxes = computed(() => portfolioRadar(this.positions(), this.market(), this.watchlist(), this.days(), this.periodLabel()));
 
     protected readonly formatPercent = (value: number) => signed(value, `${decimal(value, 2)}%`);
     protected readonly formatShare = (value: number) => `${decimal(value, 1)}%`;
@@ -241,13 +251,15 @@ export class Dashboard {
                     forkJoin({
                         // Estes dados são secundários: sem eles, o restante do painel continua útil.
                         history: this.wallet.history(days).pipe(catchError(() => of<PortfolioHistoryPoint[]>([]))),
-                        market: this.wallet.market(days).pipe(catchError(() => of(null)))
+                        market: this.wallet.market(days).pipe(catchError(() => of(null))),
+                        sentiment: this.wallet.sentiment(days).pipe(catchError(() => of(null)))
                     })
                 ),
                 takeUntilDestroyed()
             )
-            .subscribe(({ history, market }) => {
+            .subscribe(({ history, market, sentiment }) => {
                 this.history.set(history);
+                this.sentiment.set(sentiment);
                 this.market.set(market ?? []);
                 this.marketFailed.set(market === null);
                 this.periodLoading.set(false);

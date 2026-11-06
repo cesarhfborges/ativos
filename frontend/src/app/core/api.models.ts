@@ -96,6 +96,29 @@ export interface PortfolioHistoryPoint {
     totalBalance: number;
 }
 
+/** Notas de 0 (medo) a 100 (ganância). A cobertura, de 0 a 1, é a parte da carteira que tem nota nesse dia. */
+export interface SentimentReading {
+    day: string;
+    score: number;
+    rsi: number;
+    trend: number;
+    range: number;
+    volatility: number;
+    coverage: number;
+}
+
+export interface SentimentPoint {
+    day: string;
+    score: number;
+}
+
+/** Sem dados suficientes, current vem nulo. Com stale, a nota mais recente tem mais de 5 dias. */
+export interface PortfolioSentiment {
+    current: SentimentReading | null;
+    points: SentimentPoint[];
+    stale: boolean;
+}
+
 /** Comportamento de mercado de um ativo em carteira. Campos ficam nulos sem preços suficientes para calculá-los. */
 export interface MarketAsset {
     symbol: string;

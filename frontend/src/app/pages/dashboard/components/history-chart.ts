@@ -16,7 +16,7 @@ const brl = (value: number) => formatCurrency(value, 'pt-BR', 'R$', 'BRL', '1.2-
     imports: [ChartModule, ChartResize, CurrencyPipe, DatePipe],
     template: `<div class="card mb-0! h-full">
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Evolução patrimonial</h2>
-        <p class="text-muted-color mt-0! mb-6!">Quanto a carteira vale e quanto custou. O espaço entre as linhas é o lucro ou prejuízo.</p>
+        <p class="text-muted-color mt-0! mb-6!">Quanto a carteira vale e quanto custou. O espaço entre as linhas é o lucro ou prejuízo, e o último ponto é o valor de agora.</p>
 
         @if (points().length === 0) {
             <p class="text-muted-color m-0!">Ainda não há histórico neste período. Um novo ponto é registrado a cada hora cheia, quando as cotações são coletadas.</p>

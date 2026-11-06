@@ -1,14 +1,19 @@
+# Deploy no Coolify: Application com build pack "Docker Compose" (veja o README).
+# Para rodar na máquina, use docker-compose.dev.yml: as variáveis SERVICE_* só existem no Coolify.
+#
+# Variáveis mágicas usadas aqui:
+#   SERVICE_URL_<SERVIÇO>_<PORTA>  dá um domínio público ao serviço e diz ao proxy qual porta interna atender.
+#                                  Também cria SERVICE_URL_<SERVIÇO> (com https://) e SERVICE_FQDN_<SERVIÇO> (só o host).
+#   SERVICE_USER_POSTGRES          usuário gerado uma vez e mantido entre os deploys.
+#   SERVICE_PASSWORD_POSTGRES      senha gerada uma vez e mantida entre os deploys.
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      # Credenciais apenas de desenvolvimento, iguais às do application.yml.
-      POSTGRES_DB: ativos
-      POSTGRES_USER: ativos
-      POSTGRES_PASSWORD: ativos
-    ports:
-      - "127.0.0.1:5432:5432"
+      - 'POSTGRES_DB=${DB_NAME:-ativos}'
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,21 +21,28 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    networks:
-      - ativos
 
   backend:
     build:
       context: ./backend
     restart: unless-stopped
     environment:
-      DB_URL: jdbc:postgresql://db:5432/ativos
-      DB_USERNAME: ativos
-      DB_PASSWORD: ativos
-      BRAPI_TOKEN: ${BRAPI_TOKEN:-}
-      APP_ADMIN_EMAIL: ${APP_ADMIN_EMAIL:-}
-    ports:
-      - "8080:8080"
+      - SERVICE_URL_BACKEND_8080
+      - 'DB_URL=jdbc:postgresql://db:5432/${DB_NAME:-ativos}'
+      - 'DB_USERNAME=${SERVICE_USER_POSTGRES}'
+      - 'DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'CORS_ALLOWED_ORIGINS=${SERVICE_URL_FRONTEND}'
+      # O TLS termina no proxy: é ele quem informa que a requisição original veio por HTTPS.
+      - SESSION_COOKIE_SECURE=true
+      - FORWARD_HEADERS_STRATEGY=framework
+      - 'SWAGGER_ENABLED=${SWAGGER_ENABLED:-false}'
+      - 'APP_ADMIN_EMAIL=${APP_ADMIN_EMAIL:-}'
+      - 'BRAPI_TOKEN=${BRAPI_TOKEN:-}'
+      - 'MARKET_PROVIDER_CRYPTO=${MARKET_PROVIDER_CRYPTO:-binance}'
+      - 'MARKET_PROVIDER_STOCK=${MARKET_PROVIDER_STOCK:-brapi}'
+      - 'MARKET_COLLECTION_CRON=${MARKET_COLLECTION_CRON:-0 0 * * * *}'
+      - 'MARKET_COLLECT_ON_STARTUP=${MARKET_COLLECT_ON_STARTUP:-true}'
+      - 'PREDICTIVE_ENABLED=${PREDICTIVE_ENABLED:-true}'
     depends_on:
       db:
         condition: service_healthy
@@ -39,25 +51,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 30s
-    networks:
-      - ativos
+      start_period: 60s
 
   frontend:
     build:
       context: ./frontend
     restart: unless-stopped
-    ports:
-      - "4200:80"
+    environment:
+      - SERVICE_URL_FRONTEND_80
     depends_on:
       backend:
         condition: service_healthy
-    networks:
-      - ativos
-
-networks:
-  ativos:
-    driver: bridge
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
 volumes:
   postgres-data:

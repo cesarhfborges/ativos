@@ -66,6 +66,7 @@ Variáveis do `application.yml`:
 | `DB_PASSWORD` | `ativos` | Senha do banco |
 | `SERVER_PORT` | `8080` | Porta HTTP, só com `java -jar` ou `spring-boot:run`; no Tomcat externo, vale o `server.xml` |
 | `SESSION_COOKIE_SECURE` | `false` | Envia o cookie só por HTTPS; use `true` em produção |
+| `FORWARD_HEADERS_STRATEGY` | `none` | Com `framework`, confia nos cabeçalhos `X-Forwarded-*`; use só atrás de um proxy |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:4200` | Origens autorizadas a chamar a API com credenciais, separadas por vírgula |
 | `SWAGGER_ENABLED` | `true` | Publica o Swagger UI e o OpenAPI sem exigir login; use `false` em produção |
 | `MARKET_PROVIDER_CRYPTO` | `binance` | Provedor de cotações de cripto; vazio desliga a coleta do grupo |
@@ -83,8 +84,8 @@ Outros ajustes, como o cadastro público e as premissas das projeções, são fe
 ## Executar com Docker
 
 ```bash
-docker compose up --build -d
-docker compose ps       # db e backend devem ficar "healthy"
+docker compose -f docker-compose.dev.yml up --build -d
+docker compose -f docker-compose.dev.yml ps       # db e backend devem ficar "healthy"
 ```
 
 Para conferir:
@@ -92,15 +93,38 @@ Para conferir:
 ```bash
 curl http://localhost:8080/actuator/health    # {"status":"UP"}
 curl -i http://localhost:8080/api/qualquer    # 401 Unauthorized
-docker compose exec db psql -U ativos -d ativos -c "\dt"
+docker compose -f docker-compose.dev.yml exec db psql -U ativos -d ativos -c "\dt"
 ```
+
+## Deploy no Coolify
+
+O `docker-compose.yml` é o de produção e usa as variáveis mágicas do Coolify; o `docker-compose.dev.yml` é o da máquina local. Para os comandos locais continuarem funcionando sem `-f`, adicione `COMPOSE_FILE=docker-compose.dev.yml` ao `.env`.
+
+Para criar o recurso:
+
+1. Em **New Resource**, escolha o repositório pelo GitHub App e o build pack **Docker Compose**, com **Base Directory** `/` e **Docker Compose Location** `/docker-compose.yml`.
+2. Confira em **Domains** os domínios gerados para `frontend` e `backend`, ou troque-os pelos definitivos.
+3. Em **Environment Variables**, preencha `APP_ADMIN_EMAIL` e `BRAPI_TOKEN`. As demais já têm padrão.
+4. Faça o deploy e cadastre a conta com o e-mail de `APP_ADMIN_EMAIL`. Ela é promovida a administrador quando a aplicação inicia, então reinicie o `backend` depois do cadastro.
+
+| Variável | Quem define | Uso |
+| --- | --- | --- |
+| `SERVICE_URL_FRONTEND_80` | Coolify | Domínio público da aplicação e porta do Nginx |
+| `SERVICE_URL_FRONTEND` | Coolify | URL base (com `https://`), usada em `CORS_ALLOWED_ORIGINS` |
+| `SERVICE_FQDN_FRONTEND` | Coolify | O mesmo host, sem o protocolo |
+| `SERVICE_URL_BACKEND_8080` | Coolify | Domínio público da API e porta do Tomcat |
+| `SERVICE_USER_POSTGRES`, `SERVICE_PASSWORD_POSTGRES` | Coolify | Credenciais do banco, mantidas entre os deploys |
+
+O navegador sempre chama `/api` no domínio do `frontend`, e o Nginx encaminha para `backend:8080` pela rede interna. O domínio próprio do `backend` serve para acessar a API diretamente, como no Swagger (`SWAGGER_ENABLED=true`). Para não expor a API por fora, remova a linha `SERVICE_URL_BACKEND_8080`; a aplicação continua funcionando.
+
+O banco não tem porta publicada. O Postgres só usa as credenciais ao criar o volume: trocar a senha no painel depois disso não altera a senha do banco, e o `backend` deixa de conectar.
 
 ## Executar localmente
 
 Sobe só o banco no Docker e roda a aplicação pelo Maven, que ativa o perfil `local`:
 
 ```bash
-docker compose up -d db
+docker compose -f docker-compose.dev.yml up -d db
 cd backend
 mvn spring-boot:run
 ```
@@ -145,7 +169,7 @@ npm start        # http://localhost:4200, com /api encaminhado ao backend
 npm test -- --watch=false --browsers=ChromeHeadless
 ```
 
-No `docker compose up --build`, o frontend sobe em <http://localhost:4200>, servido pelo Nginx, que encaminha `/api/` ao backend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
+No `docker compose -f docker-compose.dev.yml up --build`, o frontend sobe em <http://localhost:4200>, servido pelo Nginx, que encaminha `/api/` ao backend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
 
 Telas: login, registro, painel para acompanhamento (patrimônio, desempenho, posições a mercado, evolução patrimonial, alocação e últimas operações), carteira para registrar compras e vendas, extrato com filtro por tipo e lucro realizado, projeções e, para administradores, visão geral, usuários, ativos, configurações e auditoria. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
 
@@ -333,7 +357,7 @@ O Flyway não gerencia as tabelas `spring_session*`: o próprio Spring Session a
 ## Comandos úteis
 
 ```bash
-docker compose logs -f backend    # acompanha os logs
-docker compose down               # para os containers e mantém os dados
-docker compose down -v            # para os containers e APAGA os dados do banco
+docker compose -f docker-compose.dev.yml logs -f backend    # acompanha os logs
+docker compose -f docker-compose.dev.yml down               # para os containers e mantém os dados
+docker compose -f docker-compose.dev.yml down -v            # para os containers e APAGA os dados do banco
 ```

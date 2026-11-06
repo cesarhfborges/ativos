@@ -23,6 +23,8 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Com framework, confia em X-Forwarded-*: só use atrás de um proxy, que é quem define esses cabeçalhos.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
   servlet:
     session:
       cookie:

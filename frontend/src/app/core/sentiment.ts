@@ -1,33 +1,40 @@
 import { format, parseISO } from 'date-fns';
 import { SentimentReading } from './api.models';
+import { SentimentTone } from './chart-theme';
 
 export interface SentimentZone {
     label: string;
+    tone: SentimentTone;
     /** Nota inicial da faixa, inclusive. */
     from: number;
 }
 
 /** Em ordem crescente. A faixa neutra é estreita de propósito: o índice raramente fica exatamente no meio. */
 export const SENTIMENT_ZONES: readonly SentimentZone[] = [
-    { label: 'Medo extremo', from: 0 },
-    { label: 'Medo', from: 25 },
-    { label: 'Neutro', from: 45 },
-    { label: 'Ganância', from: 56 },
-    { label: 'Ganância extrema', from: 76 }
+    { label: 'Medo extremo', tone: 'extremeFear', from: 0 },
+    { label: 'Medo', tone: 'fear', from: 25 },
+    { label: 'Neutro', tone: 'neutral', from: 45 },
+    { label: 'Ganância', tone: 'greed', from: 56 },
+    { label: 'Ganância extrema', tone: 'extremeGreed', from: 76 }
 ];
 
 /** Onde a grade do gráfico marca as mudanças de faixa. */
 export const SENTIMENT_TICKS = [0, 25, 45, 55, 75, 100];
 
-export type SentimentTone = 'fear' | 'neutral' | 'greed';
-
-/** Onde a cor muda, na nota sem arredondar: 44,5 já aparece como 45 e é Neutro, e 55,5 aparece como 56 e é Ganância. */
-export const NEUTRAL_FROM = 44.5;
-export const NEUTRAL_TO = 55.5;
-
-export function sentimentTone(score: number): SentimentTone {
-    return score < NEUTRAL_FROM ? 'fear' : score < NEUTRAL_TO ? 'neutral' : 'greed';
+export interface SentimentBand {
+    tone: SentimentTone;
+    from: number;
+    to: number;
 }
+
+/**
+ * As faixas na nota sem arredondar, para desenhar. Cada uma começa meio ponto antes do número escrito: 44,5 já aparece
+ * como 45, que é Neutro, então a cor muda ali.
+ */
+export const SENTIMENT_BANDS: readonly SentimentBand[] = SENTIMENT_ZONES.map((zone, index) => {
+    const next = SENTIMENT_ZONES[index + 1];
+    return { tone: zone.tone, from: zone.from === 0 ? 0 : zone.from - 0.5, to: next ? next.from - 0.5 : 100 };
+});
 
 export interface GaugePoint {
     x: number;

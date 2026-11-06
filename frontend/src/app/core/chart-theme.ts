@@ -1,3 +1,5 @@
+export type SentimentTone = 'extremeFear' | 'fear' | 'neutral' | 'greed' | 'extremeGreed';
+
 export interface ChartTheme {
     text: string;
     grid: string;
@@ -5,8 +7,8 @@ export interface ChartTheme {
     surface: string;
     /** Cores por série, nesta ordem: validada contra daltonismo para séries vizinhas, na superfície de cada tema. */
     series: readonly string[];
-    /** Medo, neutro e ganância. Validada contra daltonismo nesta ordem, com o azul separando o vermelho do verde. */
-    sentiment: { fear: string; neutral: string; greed: string };
+    /** Uma cor por faixa, mais forte longe do neutro. Validada contra daltonismo nesta ordem, para faixas vizinhas. */
+    sentiment: Record<SentimentTone, string>;
 }
 
 const THEMES: Record<'light' | 'dark', ChartTheme> = {
@@ -16,7 +18,7 @@ const THEMES: Record<'light' | 'dark', ChartTheme> = {
         baseline: 'rgba(100, 116, 139, 0.6)',
         surface: '#ffffff',
         series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300'],
-        sentiment: { fear: '#d92d20', neutral: '#2a78d6', greed: '#0a8a3f' }
+        sentiment: { extremeFear: '#a61b12', fear: '#ea6a1f', neutral: '#2a78d6', greed: '#5a9e1f', extremeGreed: '#0a6b3a' }
     },
     dark: {
         text: '#a1a1aa',
@@ -24,7 +26,7 @@ const THEMES: Record<'light' | 'dark', ChartTheme> = {
         baseline: 'rgba(161, 161, 170, 0.6)',
         surface: '#18181b',
         series: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300'],
-        sentiment: { fear: '#f0584f', neutral: '#3987e5', greed: '#2fae63' }
+        sentiment: { extremeFear: '#dc2f26', fear: '#cf8024', neutral: '#3987e5', greed: '#6ca62f', extremeGreed: '#157a4b' }
     }
 };
 

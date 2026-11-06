@@ -1,6 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { chartTheme } from '@/app/core/chart-theme';
-import { GAUGE_CENTER, gaugeArc, gaugePoint, NEUTRAL_FROM, NEUTRAL_TO, sentimentZone } from '@/app/core/sentiment';
+import { GAUGE_CENTER, gaugeArc, gaugePoint, SENTIMENT_BANDS, sentimentZone } from '@/app/core/sentiment';
 import { LayoutService } from '@/app/layout/service/layout.service';
 
 const ARC_RADIUS = 96;
@@ -67,11 +67,12 @@ export class SentimentGauge {
     protected readonly description = computed(() => `Medidor de ganância e medo, de 0 a 100: nota ${this.rounded()}, ${this.zone()}.`);
 
     protected readonly arcs = computed(() => {
-        const { fear, neutral, greed } = this.theme().sentiment;
-        return [
-            { key: 'fear', color: fear, path: gaugeArc(0, NEUTRAL_FROM - GAP, ARC_RADIUS) },
-            { key: 'neutral', color: neutral, path: gaugeArc(NEUTRAL_FROM + GAP, NEUTRAL_TO - GAP, ARC_RADIUS) },
-            { key: 'greed', color: greed, path: gaugeArc(NEUTRAL_TO + GAP, 100, ARC_RADIUS) }
-        ];
+        const colors = this.theme().sentiment;
+        // As pontas da escala não têm vizinho, então não precisam do respiro.
+        return SENTIMENT_BANDS.map(({ tone, from, to }) => ({
+            key: tone,
+            color: colors[tone],
+            path: gaugeArc(from === 0 ? 0 : from + GAP, to === 100 ? 100 : to - GAP, ARC_RADIUS)
+        }));
     });
 }

@@ -4,7 +4,7 @@ import { MessageModule } from 'primeng/message';
 import { ChartModule } from 'primeng/chart';
 import { PortfolioSentiment } from '@/app/core/api.models';
 import { chartTheme } from '@/app/core/chart-theme';
-import { coverageNote, NEUTRAL_FROM, NEUTRAL_TO, SENTIMENT_TICKS, SENTIMENT_ZONES, sentimentComponents, sentimentDay, sentimentTone, sentimentZone } from '@/app/core/sentiment';
+import { coverageNote, SENTIMENT_BANDS, SENTIMENT_TICKS, SENTIMENT_ZONES, sentimentComponents, sentimentDay, sentimentZone } from '@/app/core/sentiment';
 import { LayoutService } from '@/app/layout/service/layout.service';
 import { ChartResize } from '@/app/shared/chart-resize';
 import { SentimentGauge } from './sentiment-gauge';
@@ -53,7 +53,7 @@ interface PointContext {
                         <ul class="list-none flex flex-wrap gap-x-4 gap-y-1 p-0 m-0 mt-4 text-sm text-muted-color">
                             @for (item of zones; track item.label; let index = $index) {
                                 <li class="flex items-center gap-2">
-                                    <span class="inline-block w-3 h-3 rounded-sm shrink-0" aria-hidden="true" [style.background-color]="toneColor(item.from)"></span>
+                                    <span class="inline-block w-3 h-3 rounded-sm shrink-0" aria-hidden="true" [style.background-color]="theme().sentiment[item.tone]"></span>
                                     <span><span class="tabular-nums">{{ item.from }}–{{ (zones[index + 1]?.from ?? 101) - 1 }}</span> {{ item.label }}</span>
                                 </li>
                             }
@@ -112,7 +112,7 @@ export class SentimentChart {
     protected readonly zones = SENTIMENT_ZONES;
     protected readonly day = sentimentDay;
 
-    private readonly theme = computed(() => chartTheme(this.layoutService.isDarkTheme()));
+    protected readonly theme = computed(() => chartTheme(this.layoutService.isDarkTheme()));
     private readonly points = computed(() => this.sentiment()?.points ?? []);
 
     private readonly current = computed(() => this.sentiment()?.current ?? null);
@@ -124,9 +124,6 @@ export class SentimentChart {
         const current = this.current();
         return current ? coverageNote(current.coverage) : null;
     });
-
-    /** Lê o tema a cada chamada, então a legenda acompanha a troca entre claro e escuro. */
-    protected readonly toneColor = (score: number) => this.theme().sentiment[sentimentTone(score)];
 
     protected readonly recentRows = computed(() =>
         this.points()
@@ -145,7 +142,7 @@ export class SentimentChart {
     protected readonly chartData = computed(() => {
         const colors = this.theme().sentiment;
         const points = this.points();
-        const pointColor = (context: PointContext) => colors[sentimentTone(context.parsed?.y ?? 50)];
+        const pointColor = (context: PointContext) => colors[sentimentZone(context.parsed?.y ?? 50).tone];
         return {
             labels: points.map((point) => sentimentDay(point.day)),
             datasets: [
@@ -158,12 +155,10 @@ export class SentimentChart {
                             return colors.neutral;
                         }
                         const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-                        gradient.addColorStop(0, colors.fear);
-                        gradient.addColorStop(NEUTRAL_FROM / 100, colors.fear);
-                        gradient.addColorStop(NEUTRAL_FROM / 100, colors.neutral);
-                        gradient.addColorStop(NEUTRAL_TO / 100, colors.neutral);
-                        gradient.addColorStop(NEUTRAL_TO / 100, colors.greed);
-                        gradient.addColorStop(1, colors.greed);
+                        SENTIMENT_BANDS.forEach(({ tone, from, to }) => {
+                            gradient.addColorStop(from / 100, colors[tone]);
+                            gradient.addColorStop(to / 100, colors[tone]);
+                        });
                         return gradient;
                     },
                     backgroundColor: pointColor,

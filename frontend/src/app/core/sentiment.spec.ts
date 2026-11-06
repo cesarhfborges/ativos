@@ -1,5 +1,5 @@
 import { SentimentReading } from './api.models';
-import { coverageNote, GAUGE_CENTER, gaugeArc, gaugePoint, sentimentComponents, sentimentDay, sentimentTone, sentimentZone } from './sentiment';
+import { coverageNote, GAUGE_CENTER, gaugeArc, gaugePoint, SENTIMENT_BANDS, sentimentComponents, sentimentDay, sentimentZone } from './sentiment';
 
 describe('sentiment', () => {
     it('classifica os limites de cada faixa', () => {
@@ -20,11 +20,19 @@ describe('sentiment', () => {
         expect(sentimentZone(55.4).label).toBe('Neutro');
     });
 
-    it('a cor acompanha a faixa escrita, inclusive nos limites arredondados', () => {
-        for (const score of [0, 24.6, 44.4, 44.5, 50, 55.4, 55.5, 75, 100]) {
-            const tone = sentimentTone(score);
-            const label = sentimentZone(score).label;
-            expect(tone).toBe(label.startsWith('Medo') ? 'fear' : label === 'Neutro' ? 'neutral' : 'greed');
+    it('as faixas de desenho cobrem a escala inteira, sem buracos', () => {
+        expect(SENTIMENT_BANDS[0].from).toBe(0);
+        expect(SENTIMENT_BANDS.at(-1)!.to).toBe(100);
+        SENTIMENT_BANDS.slice(1).forEach((band, index) => expect(band.from).toBe(SENTIMENT_BANDS[index].to));
+    });
+
+    it('cada faixa tem a própria cor, e ela muda onde o nome escrito muda', () => {
+        expect(new Set(SENTIMENT_BANDS.map((band) => band.tone)).size).toBe(5);
+        for (const band of SENTIMENT_BANDS.slice(1)) {
+            const before = sentimentZone(band.from - 0.01);
+            const after = sentimentZone(band.from);
+            expect(before.tone).not.toBe(after.tone);
+            expect(after.tone).toBe(band.tone);
         }
     });
 

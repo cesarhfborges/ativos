@@ -68,7 +68,7 @@ Variáveis do `application.yml`:
 | `SESSION_COOKIE_SECURE` | `false` | Envia o cookie só por HTTPS; use `true` em produção |
 | `FORWARD_HEADERS_STRATEGY` | `none` | Com `framework`, confia nos cabeçalhos `X-Forwarded-*`; use só atrás de um proxy |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:4200` | Origens autorizadas a chamar a API com credenciais, separadas por vírgula |
-| `SWAGGER_ENABLED` | `true` | Publica o Swagger UI e o OpenAPI sem exigir login; use `false` em produção |
+| `SWAGGER_ENABLED` | `true` | Publica o Swagger UI e o OpenAPI sem exigir login; o `docker-compose.yml` de produção fixa `false` |
 | `MARKET_PROVIDER_CRYPTO` | `binance` | Provedor de cotações de cripto; vazio desliga a coleta do grupo |
 | `MARKET_PROVIDER_STOCK` | `brapi` | Provedor de cotações de ações; vazio desliga a coleta do grupo |
 | `BRAPI_TOKEN` | Vazio | Token da Brapi; sem ele, só alguns ativos de teste têm cotação (PETR4, VALE3, ITUB4 e MGLU3) |
@@ -103,21 +103,27 @@ O `docker-compose.yml` é o de produção e usa as variáveis mágicas do Coolif
 Para criar o recurso:
 
 1. Em **New Resource**, escolha o repositório pelo GitHub App e o build pack **Docker Compose**, com **Base Directory** `/` e **Docker Compose Location** `/docker-compose.yml`.
-2. Confira em **Domains** os domínios gerados para `frontend` e `backend`, ou troque-os pelos definitivos.
+2. Confira em **Domains** o domínio gerado para o `nginx`, ou troque-o pelo definitivo. Os outros serviços ficam sem domínio.
 3. Em **Environment Variables**, preencha `APP_ADMIN_EMAIL` e `BRAPI_TOKEN`. As demais já têm padrão.
 4. Faça o deploy e cadastre a conta com o e-mail de `APP_ADMIN_EMAIL`. Ela é promovida a administrador quando a aplicação inicia, então reinicie o `backend` depois do cadastro.
 
 | Variável | Quem define | Uso |
 | --- | --- | --- |
-| `SERVICE_URL_FRONTEND_80` | Coolify | Domínio público da aplicação e porta do Nginx |
-| `SERVICE_URL_FRONTEND` | Coolify | URL base (com `https://`), usada em `CORS_ALLOWED_ORIGINS` |
-| `SERVICE_FQDN_FRONTEND` | Coolify | O mesmo host, sem o protocolo |
-| `SERVICE_URL_BACKEND_8080` | Coolify | Domínio público da API e porta do Tomcat |
+| `SERVICE_URL_NGINX_80` | Coolify | Domínio público da aplicação e porta do Nginx |
+| `SERVICE_URL_NGINX` | Coolify | URL base (com `https://`), usada em `CORS_ALLOWED_ORIGINS` |
+| `SERVICE_FQDN_NGINX` | Coolify | O mesmo host, sem o protocolo |
 | `SERVICE_USER_POSTGRES`, `SERVICE_PASSWORD_POSTGRES` | Coolify | Credenciais do banco, mantidas entre os deploys |
 
-O navegador sempre chama `/api` no domínio do `frontend`, e o Nginx encaminha para `backend:8080` pela rede interna. O domínio próprio do `backend` serve para acessar a API diretamente, como no Swagger (`SWAGGER_ENABLED=true`). Para não expor a API por fora, remova a linha `SERVICE_URL_BACKEND_8080`; a aplicação continua funcionando.
+O sistema tem quatro containers, e o `nginx` é a única entrada:
 
-O banco não tem porta publicada. O Postgres só usa as credenciais ao criar o volume: trocar a senha no painel depois disso não altera a senha do banco, e o `backend` deixa de conectar.
+| Caminho | Destino |
+| --- | --- |
+| `/api/*` | `backend:8080` (Tomcat) |
+| `/*` | `frontend:80` (Caddy, que serve os arquivos do Angular) |
+
+O `backend` só fala com o `db`, e nenhum dos dois tem domínio ou porta publicada. Como só `/api/` é encaminhado, `/actuator` e o Swagger não são alcançáveis por fora. O proxy do Coolify continua na frente do `nginx`, cuidando do domínio e do HTTPS.
+
+O Postgres só usa as credenciais ao criar o volume: trocar a senha no painel depois disso não altera a senha do banco, e o `backend` deixa de conectar.
 
 ## Executar localmente
 
@@ -169,7 +175,7 @@ npm start        # http://localhost:4200, com /api encaminhado ao backend
 npm test -- --watch=false --browsers=ChromeHeadless
 ```
 
-No `docker compose -f docker-compose.dev.yml up --build`, o frontend sobe em <http://localhost:4200>, servido pelo Nginx, que encaminha `/api/` ao backend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
+No `docker compose -f docker-compose.dev.yml up --build`, a aplicação sobe em <http://localhost:4200>: o Nginx encaminha `/api/` ao backend e o restante ao container do frontend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
 
 Telas: login, registro, painel para acompanhamento (patrimônio, desempenho, posições a mercado, evolução patrimonial, alocação e últimas operações), carteira para registrar compras e vendas, extrato com filtro por tipo e lucro realizado, projeções e, para administradores, visão geral, usuários, ativos, configurações e auditoria. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
 

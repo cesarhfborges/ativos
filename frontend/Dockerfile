@@ -5,6 +5,6 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-FROM nginx:1.29-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist/ativos/browser /usr/share/nginx/html
+FROM caddy:2.10-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist/ativos/browser /srv

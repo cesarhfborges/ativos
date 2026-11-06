@@ -1,9 +1,12 @@
 # Deploy no Coolify: Application com build pack "Docker Compose" (veja o README).
 # Para rodar na máquina, use docker-compose.dev.yml: as variáveis SERVICE_* só existem no Coolify.
 #
+# O nginx é a única entrada: /api/* vai para o backend e o restante para o frontend.
+# Só ele tem domínio; backend, frontend e db ficam acessíveis apenas pela rede interna.
+#
 # Variáveis mágicas usadas aqui:
-#   SERVICE_URL_<SERVIÇO>_<PORTA>  dá um domínio público ao serviço e diz ao proxy qual porta interna atender.
-#                                  Também cria SERVICE_URL_<SERVIÇO> (com https://) e SERVICE_FQDN_<SERVIÇO> (só o host).
+#   SERVICE_URL_NGINX_80           dá o domínio público ao nginx e diz ao proxy do Coolify qual porta interna atender.
+#                                  Também cria SERVICE_URL_NGINX (com https://) e SERVICE_FQDN_NGINX (só o host).
 #   SERVICE_USER_POSTGRES          usuário gerado uma vez e mantido entre os deploys.
 #   SERVICE_PASSWORD_POSTGRES      senha gerada uma vez e mantida entre os deploys.
 services:
@@ -27,15 +30,15 @@ services:
       context: ./backend
     restart: unless-stopped
     environment:
-      - SERVICE_URL_BACKEND_8080
       - 'DB_URL=jdbc:postgresql://db:5432/${DB_NAME:-ativos}'
       - 'DB_USERNAME=${SERVICE_USER_POSTGRES}'
       - 'DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
-      - 'CORS_ALLOWED_ORIGINS=${SERVICE_URL_FRONTEND}'
+      - 'CORS_ALLOWED_ORIGINS=${SERVICE_URL_NGINX}'
       # O TLS termina no proxy: é ele quem informa que a requisição original veio por HTTPS.
       - SESSION_COOKIE_SECURE=true
       - FORWARD_HEADERS_STRATEGY=framework
-      - 'SWAGGER_ENABLED=${SWAGGER_ENABLED:-false}'
+      # O nginx só encaminha /api/, então o Swagger não seria alcançável de qualquer forma.
+      - SWAGGER_ENABLED=false
       - 'APP_ADMIN_EMAIL=${APP_ADMIN_EMAIL:-}'
       - 'BRAPI_TOKEN=${BRAPI_TOKEN:-}'
       - 'MARKET_PROVIDER_CRYPTO=${MARKET_PROVIDER_CRYPTO:-binance}'
@@ -57,13 +60,25 @@ services:
     build:
       context: ./frontend
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  nginx:
+    build:
+      context: ./nginx
+    restart: unless-stopped
     environment:
-      - SERVICE_URL_FRONTEND_80
+      - SERVICE_URL_NGINX_80
     depends_on:
       backend:
         condition: service_healthy
+      frontend:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/nginx-health"]
       interval: 10s
       timeout: 5s
       retries: 6

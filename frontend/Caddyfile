@@ -1,0 +1,10 @@
+{
+	admin off
+}
+
+:80 {
+	root * /srv
+	# Rotas do Angular: qualquer caminho que não seja arquivo devolve a SPA.
+	try_files {path} /index.html
+	file_server
+}

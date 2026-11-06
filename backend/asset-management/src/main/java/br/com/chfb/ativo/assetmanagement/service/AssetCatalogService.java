@@ -11,6 +11,7 @@ import br.com.chfb.ativo.assetmanagement.exception.BusinessRuleException;
 import br.com.chfb.ativo.assetmanagement.repository.AssetRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletPositionRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletTransactionRepository;
+import br.com.chfb.ativo.assetmanagement.repository.WatchlistItemRepository;
 import br.com.chfb.ativo.sharedkernel.market.SymbolCheck;
 import br.com.chfb.ativo.sharedkernel.market.SymbolVerifier;
 import java.util.Collection;
@@ -36,12 +37,15 @@ public class AssetCatalogService {
     private final WalletPositionRepository positionRepository;
     private final WalletTransactionRepository transactionRepository;
     private final SymbolVerifier symbolVerifier;
+    private final WatchlistItemRepository watchlistRepository;
 
     public AssetCatalogService(
             AssetRepository assetRepository,
             WalletPositionRepository positionRepository,
             WalletTransactionRepository transactionRepository,
-            SymbolVerifier symbolVerifier) {
+            SymbolVerifier symbolVerifier,
+            WatchlistItemRepository watchlistRepository) {
+        this.watchlistRepository = watchlistRepository;
         this.assetRepository = assetRepository;
         this.positionRepository = positionRepository;
         this.transactionRepository = transactionRepository;
@@ -90,6 +94,9 @@ public class AssetCatalogService {
         Asset asset = find(id);
         if (!counts(transactionRepository.countByAsset(List.of(id))).isEmpty()) {
             throw new BusinessRuleException("Este ativo tem operações registradas e não pode ser removido");
+        }
+        if (watchlistRepository.countByAssetId(id) > 0) {
+            throw new BusinessRuleException("Este ativo está sendo acompanhado por usuários e não pode ser removido");
         }
         assetRepository.delete(asset);
         return asset.getSymbol();

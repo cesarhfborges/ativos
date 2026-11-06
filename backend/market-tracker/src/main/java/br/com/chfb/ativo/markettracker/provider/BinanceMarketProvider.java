@@ -60,6 +60,8 @@ public class BinanceMarketProvider implements CryptoMarketProvider {
             Map.entry("USDT", "Tether"),
             Map.entry("XRP", "XRP"));
 
+    private static final String NO_PRICE = "A Binance não devolveu preço";
+
     private final RestClient restClient;
     private final String baseUrl;
     private final String quoteAsset;
@@ -75,8 +77,9 @@ public class BinanceMarketProvider implements CryptoMarketProvider {
     }
 
     @Override
-    public Map<String, BigDecimal> fetchCryptoPrices(Set<String> symbols) {
+    public PriceFetch fetchCryptoPrices(Set<String> symbols) {
         Map<String, BigDecimal> prices = new HashMap<>();
+        Map<String, String> failures = new HashMap<>();
         for (String symbol : symbols) {
             try {
                 TickerPrice ticker = restClient.get()
@@ -85,12 +88,15 @@ public class BinanceMarketProvider implements CryptoMarketProvider {
                         .body(TickerPrice.class);
                 if (ticker != null && ticker.price() != null) {
                     prices.put(symbol, ticker.price());
+                } else {
+                    failures.put(symbol, NO_PRICE);
                 }
             } catch (RestClientException e) {
                 log.warn("Binance sem cotação para {}{}: {}", symbol, quoteAsset, e.getMessage());
+                failures.put(symbol, e.getMessage());
             }
         }
-        return prices;
+        return new PriceFetch(prices, failures);
     }
 
     @Override

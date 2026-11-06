@@ -1,7 +1,9 @@
 package br.com.chfb.ativo.coreapi.exception;
 
 import br.com.chfb.ativo.assetmanagement.exception.AssetNotFoundException;
+import br.com.chfb.ativo.assetmanagement.exception.AlreadyWatchedException;
 import br.com.chfb.ativo.assetmanagement.exception.AssetTypeConflictException;
+import br.com.chfb.ativo.assetmanagement.exception.WatchlistItemNotFoundException;
 import br.com.chfb.ativo.assetmanagement.exception.BusinessRuleException;
 import br.com.chfb.ativo.assetmanagement.exception.SymbolNotFoundException;
 import br.com.chfb.ativo.assetmanagement.exception.TransactionNotFoundException;
@@ -50,6 +52,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidCurrentPasswordException.class)
     public ProblemDetail handleInvalidCurrentPassword(InvalidCurrentPasswordException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler(AlreadyWatchedException.class)
+    public ProblemDetail handleAlreadyWatched(AlreadyWatchedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(WatchlistItemNotFoundException.class)
+    public ProblemDetail handleWatchlistItemNotFound(WatchlistItemNotFoundException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(AssetTypeConflictException.class)

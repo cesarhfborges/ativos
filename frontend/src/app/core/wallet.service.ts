@@ -33,11 +33,6 @@ export class WalletService {
         return this.http.get<MarketAsset[]>('/api/dashboard/market', { params: { days } });
     }
 
-    /** `refreshed` é falso quando já houve uma coleta no último minuto. */
-    refreshQuotes(): Observable<{ refreshed: boolean }> {
-        return this.http.post<{ refreshed: boolean }>('/api/dashboard/refresh-quotes', null);
-    }
-
     buy(body: BuyRequest): Observable<Transaction> {
         return this.http.post<Transaction>('/api/transactions/buy', body);
     }

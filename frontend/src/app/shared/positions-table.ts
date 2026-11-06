@@ -8,7 +8,8 @@ import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { TableModule } from 'primeng/table';
-import { AssetType, DashboardPosition, MarketAsset, Position } from '@/app/core/api.models';
+import { AssetType, DashboardPosition, MarketAsset, Position, WatchlistItem } from '@/app/core/api.models';
+import { PlanSummary } from '@/app/shared/plan-summary';
 import { PercentChange } from './percent-change';
 import { ProfitLoss } from './profit-loss';
 import { Sparkline } from './sparkline';
@@ -21,7 +22,7 @@ type TypeFilter = AssetType | 'ALL';
 
 @Component({
     selector: 'app-positions-table',
-    imports: [ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, IconFieldModule, InputIconModule, InputTextModule, PercentChange, ProfitLoss, RouterLink, SelectButtonModule, Sparkline, TableModule],
+    imports: [ButtonModule, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, IconFieldModule, InputIconModule, InputTextModule, PercentChange, PlanSummary, ProfitLoss, RouterLink, SelectButtonModule, Sparkline, TableModule],
     template: `@if (positions().length === 0) {
             <p class="text-center text-muted-color py-8 m-0!">
                 Você ainda não tem posições abertas.
@@ -66,6 +67,9 @@ type TypeFilter = AssetType | 'ALL';
                         <td>
                             <div class="font-medium">{{ row.symbol }}</div>
                             <div class="text-muted-color text-sm max-w-44 truncate" [title]="row.subtitle">{{ row.subtitle }}</div>
+                            @if (planOf(row.symbol); as plan) {
+                                <div class="text-sm mt-1 max-w-56"><app-plan-summary [item]="plan" /></div>
+                            }
                         </td>
                         <td class="text-right tabular-nums whitespace-nowrap">
                             <div>{{ row.quantity | number: '1.0-8' }}</div>
@@ -128,9 +132,12 @@ type TypeFilter = AssetType | 'ALL';
                             </div>
                         </td>
                         @if (manageable()) {
-                            <td class="text-right whitespace-nowrap">
-                                <p-button label="Comprar" size="small" [text]="true" [ariaLabel]="'Comprar mais ' + row.symbol" (onClick)="buy.emit(row)" />
-                                <p-button label="Vender" size="small" severity="secondary" [text]="true" [ariaLabel]="'Vender ' + row.symbol" (onClick)="sell.emit(row)" />
+                            <td class="whitespace-nowrap">
+                                <div class="flex flex-col items-end">
+                                    <p-button label="Comprar" size="small" [text]="true" [ariaLabel]="'Comprar mais ' + row.symbol" (onClick)="buy.emit(row)" />
+                                    <p-button label="Vender" size="small" severity="secondary" [text]="true" [ariaLabel]="'Vender ' + row.symbol" (onClick)="sell.emit(row)" />
+                                    <p-button label="Plano" size="small" severity="secondary" [text]="true" [ariaLabel]="(planOf(row.symbol) ? 'Editar plano de ' : 'Definir plano de ') + row.symbol" (onClick)="plan.emit(row)" />
+                                </div>
                             </td>
                         }
                     </tr>
@@ -171,7 +178,11 @@ export class PositionsTable {
     readonly periodLabel = input('');
     readonly buy = output<Position>();
     readonly sell = output<Position>();
+    readonly plan = output<DashboardPosition>();
+    /** Ativos acompanhados: quem tem plano mostra os alvos junto da posição. */
+    readonly plans = input<WatchlistItem[]>([]);
 
+    private readonly plansBySymbol = computed(() => new Map(this.plans().map((item) => [item.symbol, item])));
     protected readonly search = signal('');
     protected readonly typeFilter = signal<TypeFilter>('ALL');
     protected readonly typeOptions: { label: string; value: TypeFilter }[] = [
@@ -234,7 +245,11 @@ export class PositionsTable {
         };
     });
 
+    protected planOf(symbol: string): WatchlistItem | undefined {
+        return this.plansBySymbol().get(symbol);
+    }
+
     protected readonly columnsBeforeValue = computed(() => (this.market() ? 5 : 3));
     protected readonly columnCount = computed(() => this.columnsBeforeValue() + 3 + (this.manageable() ? 1 : 0));
-    protected readonly tableWidth = computed(() => `${(this.market() ? 70 : 48) + (this.manageable() ? 12 : 0)}rem`);
+    protected readonly tableWidth = computed(() => `${(this.market() ? 70 : 48) + (this.manageable() ? 8 : 0)}rem`);
 }

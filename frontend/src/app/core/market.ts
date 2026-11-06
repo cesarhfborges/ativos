@@ -1,5 +1,13 @@
 import { DashboardPosition, MarketAsset, PortfolioHistoryPoint, PricePoint } from './api.models';
 
+/** Períodos de análise oferecidos nas telas de mercado. */
+export const MARKET_PERIODS = [
+    { label: '7 dias', value: 7 },
+    { label: '30 dias', value: 30 },
+    { label: '90 dias', value: 90 },
+    { label: '1 ano', value: 365 }
+];
+
 export interface PortfolioChange {
     percent: number;
     value: number;

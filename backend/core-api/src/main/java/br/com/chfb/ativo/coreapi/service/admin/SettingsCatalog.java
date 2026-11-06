@@ -14,6 +14,7 @@ final class SettingsCatalog {
 
     private static final String ACCESS = "Acesso";
     private static final String COLLECTION = "Coleta de cotações";
+    private static final String WATCHLIST = "Acompanhamento";
     private static final String PROJECTION = "Projeções";
     private static final String REFERENCE = "Premissas de referência";
     private static final String SCENARIOS = "Cenários";
@@ -21,8 +22,10 @@ final class SettingsCatalog {
 
     static final List<Definition> ALL = List.of(
             bool(SettingKeys.REGISTRATION_ENABLED, ACCESS, "Cadastro público", "Permite criar conta pela tela de registro. O admin sempre pode criar contas."),
-            bool(SettingKeys.COLLECTION_ENABLED, COLLECTION, "Coleta automática", "Pausada, não há novas cotações agendadas nem snapshots. A atualização manual continua disponível."),
-            integer(SettingKeys.MANUAL_REFRESH_SECONDS, COLLECTION, "Intervalo da atualização manual (segundos)", "Tempo mínimo entre coletas pedidas pelos usuários, que consomem a cota das APIs externas.", 10, 3600),
+            bool(SettingKeys.COLLECTION_ENABLED, COLLECTION, "Coleta automática", "Pausada, não há novas cotações agendadas nem snapshots, e um símbolo novo espera a retomada. O admin ainda pode coletar pela tela de sincronização."),
+            integer(SettingKeys.MANUAL_REFRESH_SECONDS, COLLECTION, "Intervalo da coleta pelo admin (segundos)", "Tempo mínimo entre coletas pedidas na tela de sincronização, que consomem a cota das APIs externas.", 10, 3600),
+            integer(SettingKeys.SYNC_LOG_RETENTION_DAYS, COLLECTION, "Retenção dos registros de sincronização (dias)", "Registros mais antigos são apagados depois de cada coleta agendada.", 7, 3650),
+            integer(SettingKeys.WATCHLIST_MAX_ITEMS, WATCHLIST, "Ativos acompanhados por usuário", "Só protege a cota das APIs externas contra abuso: um mesmo ativo é consultado uma vez, não importa quantos usuários o acompanhem.", 1, 1000),
             integer(SettingKeys.MIN_HISTORY_DAYS, PROJECTION, "Histórico mínimo por ativo (dias)", "Com menos dias de cotações, o ativo usa as premissas de referência.", 7, 365),
             percent(SettingKeys.MIN_OBSERVED_RETURN, PROJECTION, "Retorno anual medido: limite inferior", "Evita valores absurdos quando há pouco histórico.", "-1", "0"),
             percent(SettingKeys.MAX_OBSERVED_RETURN, PROJECTION, "Retorno anual medido: limite superior", "Evita valores absurdos quando há pouco histórico.", "0", "5"),

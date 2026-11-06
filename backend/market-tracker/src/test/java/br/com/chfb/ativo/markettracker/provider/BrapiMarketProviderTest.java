@@ -3,6 +3,7 @@ package br.com.chfb.ativo.markettracker.provider;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -59,5 +60,15 @@ class BrapiMarketProviderTest {
     void falhaDoProvedorFicaIndisponivel() {
         server.expect(requestTo(containsString("/api/quote/list"))).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
         assertThat(provider.searchStocks("PETR", 10).available()).isFalse();
+    }
+
+    @Test
+    void cotacaoQueFalhaVoltaComOMotivo() {
+        server.expect(requestTo(containsString("/api/quote/BBSE3"))).andRespond(withServerError());
+
+        PriceFetch result = provider.fetchStockPrices(java.util.Set.of("BBSE3"));
+
+        assertThat(result.prices()).isEmpty();
+        assertThat(result.failures().get("BBSE3")).contains("500");
     }
 }

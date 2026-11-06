@@ -177,7 +177,7 @@ npm test -- --watch=false --browsers=ChromeHeadless
 
 No `docker compose -f docker-compose.dev.yml up --build`, a aplicação sobe em <http://localhost:4200>: o Nginx encaminha `/api/` ao backend e o restante ao container do frontend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
 
-Telas: login, registro, painel para acompanhamento (patrimônio, desempenho, posições a mercado, evolução patrimonial, alocação e últimas operações), carteira para registrar compras e vendas, extrato com filtro por tipo e lucro realizado, projeções e, para administradores, visão geral, usuários, ativos, configurações e auditoria. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
+Telas: login, registro, painel para acompanhamento (patrimônio, desempenho, alvos atingidos, perfil da carteira, posições a mercado, evolução patrimonial, alocação e últimas operações), carteira para registrar compras e vendas, acompanhamento de ativos com ou sem posição, extrato com filtro por tipo e lucro realizado, projeções e, para administradores, visão geral, usuários, ativos, configurações e auditoria. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
 
 ## Documentação da API
 
@@ -231,15 +231,68 @@ A coleta de hora cheia consulta só os símbolos com posição aberta, grava a �
 | `GET /api/dashboard/positions` | Posições com preço médio, cotação e lucro ou prejuízo; sem cotação, valem pelo preço médio |
 | `GET /api/dashboard/history?days=30` | Pontos do histórico patrimonial, de 1 a 365 dias |
 | `GET /api/dashboard/market?days=30` | Por posição aberta: variação em 24 horas e no período, mínima, máxima e preços, de 1 a 365 dias |
-| `POST /api/dashboard/refresh-quotes` | Atualiza as cotações agora, uma vez por minuto no máximo, sem gerar snapshot |
 
 Para adicionar um provedor, implemente `CryptoMarketProvider` ou `StockMarketProvider` com `@ConditionalOnProperty` e aponte `market.provider.*` para ele.
+
+## Sincronização das cotações
+
+A coleta é única para todo o sistema: cada símbolo é consultado uma vez, não importa quantos usuários o tenham, e o preço vale para todos. Se dois usuários têm BTC, a coleta faz uma só consulta de BTC.
+
+| Origem | Quando roda | Abrangência |
+| --- | --- | --- |
+| Agendada | Em `MARKET_COLLECTION_CRON`; só esta gera snapshots | Todos os símbolos em carteira ou acompanhados |
+| Início da aplicação | Com `MARKET_COLLECT_ON_STARTUP=true` | Todos os símbolos em carteira ou acompanhados |
+| Admin | "Coletar agora", em **Administração > Sincronização**, respeitando o intervalo mínimo | Todos os símbolos em carteira ou acompanhados |
+| Símbolo novo | Logo após uma compra ou um novo acompanhamento, sem atrasar a resposta | Só o que falta daquele símbolo; nenhuma chamada externa se ele já estiver coberto |
+
+Os usuários comuns aguardam a coleta automática, então os preços podem ficar até 1 hora defasados com o agendamento padrão. Com a coleta pausada nas configurações, um símbolo novo também espera a retomada.
+
+A carga de fechamentos diários roda quando o símbolo nunca teve preço com mais de 1 dia ou está há mais de 2 dias sem preços, como um ativo que voltou a ser coletado. Assim o histórico não fica com um buraco. Ela é refeita a cada coleta enquanto falhar.
+
+| Endpoint | Acesso | Descrição |
+| --- | --- | --- |
+| `GET /api/market/sync-status` | Usuário logado | Última e próxima sincronização, para o indicador da topbar. Lê do banco, sem chamar os provedores |
+| `GET /api/admin/sync/runs` | Admin | Execuções paginadas; filtros `status`, `origin` e `symbol` |
+| `GET /api/admin/sync/runs/{id}/items` | Admin | Resultado de cada símbolo, com o motivo das falhas |
+| `POST /api/admin/quotes/collect` | Admin | Coleta agora; com `refreshed: false`, a última foi há menos que o intervalo mínimo |
+
+Cada execução termina como `SUCCESS`, `PARTIAL` (algo falhou), `FAILED` (nenhum preço novo) ou `INTERRUPTED` (a aplicação parou durante a coleta). A busca de um símbolo novo não conta como sincronização geral no indicador. Os registros são apagados depois de 90 dias, prazo ajustável nas configurações.
+
+## Acompanhamento
+
+A tela **Acompanhamento** lista ativos que o usuário quer observar, tendo ou não uma posição. Nada aqui altera a carteira, o patrimônio ou a rentabilidade. O plano é privado; a cotação vem da coleta centralizada, então vários usuários acompanhando o mesmo ativo geram uma só consulta. Um ativo sai da coleta quando ninguém mais o tem nem o acompanha.
+
+| Endpoint | Descrição | Respostas |
+| --- | --- | --- |
+| `GET /api/watchlist?days=30` | Ativos acompanhados, com plano, dados de mercado e posição na carteira | `200` |
+| `POST /api/watchlist` | Passa a acompanhar. Corpo: `symbol`, `assetType` e, opcionais, `name`, `buyBelow`, `sellAbove`, `stopLoss`, `note` e `acceptUnverified` | `201`, `400`, `409`, `422` |
+| `PUT /api/watchlist/{id}` | Substitui o plano: `buyBelow`, `sellAbove`, `stopLoss` e `note` | `200`, `400`, `404`, `422` |
+| `DELETE /api/watchlist/{id}` | Deixa de acompanhar e apaga o plano | `204`, `404` |
+
+- **Alvos:** "comprar abaixo de" é atingido com a cotação no preço ou abaixo dele; "vender acima de", no preço ou acima; o stop, no preço ou abaixo. Venda e stop só geram aviso para quem tem o ativo. Os alvos atingidos aparecem nas telas de Acompanhamento e Painel, e o plano também na Carteira, onde pode ser definido.
+- **Regras:** o alvo de venda precisa ser maior que o preço de compra e que o stop. O mesmo ativo não pode ser adicionado duas vezes. O limite é de 100 ativos por usuário, ajustável pelo admin; ele só protege a cota das APIs contra abuso, porque o custo depende dos símbolos distintos, não dos usuários.
+- **Catálogo:** um ativo acompanhado não pode ser removido pelo admin. Na primeira vez em que o sistema vê um símbolo, ele é conferido no provedor, como na compra.
+
+## Perfil da carteira
+
+O Painel mostra um gráfico de radar com seis notas de 0 a 100, sempre com 100 no lado favorável. Elas descrevem a carteira e não são recomendação de investimento. Um aspecto sem dados sai do desenho, em vez de parecer nota zero.
+
+| Aspecto | Como é medido | Escala |
+| --- | --- | --- |
+| Diversificação | Número efetivo de ativos, o inverso da soma dos pesos ao quadrado | 1 ativo é 0; 10 de mesmo peso é 100 |
+| Rentabilidade | Lucro ou prejuízo sobre o custo, das posições com cotação | -50% é 0; zero é 50; +50% é 100 |
+| Momento | Variação de preços no período escolhido, ponderada pelo valor | -20% é 0; zero é 50; +20% é 100 |
+| Estabilidade | Volatilidade anualizada no período, média ponderada pelo valor de cada ativo | 0% é 100; 100% ao ano ou mais é 0 |
+| Posições no lucro | Parte das posições com cotação acima do custo | Percentual direto |
+| Plano de saída | Parte das posições com alvo de venda ou stop no Acompanhamento | Percentual direto |
+
+A estabilidade é uma aproximação: a média ignora a correlação entre os ativos e, em 7 dias, as ações parecem mais estáveis porque o preço não muda fora do pregão.
 
 ## Busca de ativos
 
 `GET /api/assets?query=pe` procura no catálogo de ativos já cadastrados, compartilhado entre os usuários, pelo início do símbolo ou por parte do nome. A tela de compra usa essa busca para sugerir o símbolo e preencher o tipo; símbolos novos são cadastrados na primeira compra.
 
-`GET /api/assets/lookup?query=petr&type=STOCK` procura no provedor de cotações, inclusive ativos ainda não cadastrados, e devolve nome e cotação atual. Em ações, usa a listagem da Brapi. Em cripto, só encontra pares negociados na Binance na moeda de cotação (BRL), os únicos que o sistema consegue cotar. Com `available: false`, o provedor não respondeu, o que não significa que o ativo não existe.
+`GET /api/assets/lookup?query=petr&type=STOCK` procura no provedor de cotações, inclusive ativos ainda não cadastrados, e devolve nome e cotação atual. A mesma pesquisa, de qualquer usuário, é respondida do cache por 5 minutos. Em ações, usa a listagem da Brapi. Em cripto, só encontra pares negociados na Binance na moeda de cotação (BRL), os únicos que o sistema consegue cotar. Com `available: false`, o provedor não respondeu, o que não significa que o ativo não existe.
 
 No primeiro cadastro, o símbolo é conferido no provedor de cotações. Se ele não existir, ou só existir no outro tipo, a compra responde `422` com `code: SYMBOL_NOT_FOUND` e, se houver, `suggestedType`. Com `acceptUnverified: true`, o ativo é cadastrado como não verificado. Sem resposta do provedor, como ações fora da lista de teste da Brapi sem `BRAPI_TOKEN`, o cadastro é aceito como não verificado.
 

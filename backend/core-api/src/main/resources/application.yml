@@ -47,6 +47,7 @@ market:
   # Valores iniciais: o admin pode mudar pela tela de configurações.
   collection-enabled: true
   manual-refresh-seconds: 60
+  sync-log-retention-days: 90
   # Para trocar de provedor, basta alterar estas propriedades. Vazio desliga a coleta do grupo.
   provider:
     crypto: ${MARKET_PROVIDER_CRYPTO:binance}
@@ -61,6 +62,11 @@ market:
     base-url: https://brapi.dev
     # Sem token, a Brapi só responde para alguns ativos de teste (PETR4, VALE3, ITUB4 e MGLU3).
     token: ${BRAPI_TOKEN:}
+
+watchlist:
+  # Valor inicial: o admin pode mudar pela tela de configurações. O custo das APIs depende dos símbolos
+  # distintos, não dos usuários: este limite só protege a cota contra abuso.
+  max-items: 100
 
 # Com enabled=false, /api/predictions deixa de existir e o restante do sistema não muda.
 predictive:

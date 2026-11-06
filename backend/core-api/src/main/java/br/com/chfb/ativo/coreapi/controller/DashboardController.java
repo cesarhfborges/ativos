@@ -7,9 +7,7 @@ import br.com.chfb.ativo.assetmanagement.dto.PortfolioHistoryPoint;
 import br.com.chfb.ativo.assetmanagement.service.DashboardService;
 import br.com.chfb.ativo.assetmanagement.service.MarketOverviewService;
 import br.com.chfb.ativo.coreapi.config.OpenApiConfig;
-import br.com.chfb.ativo.coreapi.dto.QuoteRefreshResponse;
 import br.com.chfb.ativo.coreapi.security.AuthenticatedUser;
-import br.com.chfb.ativo.markettracker.service.QuoteCollector;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -21,7 +19,6 @@ import jakarta.validation.constraints.Min;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,15 +31,12 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
     private final MarketOverviewService marketOverviewService;
-    private final QuoteCollector quoteCollector;
 
     public DashboardController(
             DashboardService dashboardService,
-            MarketOverviewService marketOverviewService,
-            QuoteCollector quoteCollector) {
+            MarketOverviewService marketOverviewService) {
         this.dashboardService = dashboardService;
         this.marketOverviewService = marketOverviewService;
-        this.quoteCollector = quoteCollector;
     }
 
     @Operation(summary = "Retorna a visão consolidada: valor investido, valor a mercado e retorno")
@@ -83,15 +77,5 @@ public class DashboardController {
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days) {
         return marketOverviewService.overview(user.getId(), days);
-    }
-
-    @Operation(
-            summary = "Atualiza as cotações agora",
-            description = "Atende uma coleta por minuto, para todos os usuários; fora disso, responde refreshed=false.")
-    @ApiResponse(responseCode = "200", description = "Pedido processado")
-    @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada", content = @Content)
-    @PostMapping("/refresh-quotes")
-    public QuoteRefreshResponse refreshQuotes() {
-        return new QuoteRefreshResponse(quoteCollector.refresh());
     }
 }

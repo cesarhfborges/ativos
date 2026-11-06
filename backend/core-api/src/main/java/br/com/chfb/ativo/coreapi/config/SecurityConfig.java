@@ -36,8 +36,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
-                        // Sem isso, erros de rotas públicas viram 401 ao chegar em /error.
-                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        // Sem isso, erros viram 401 ao chegar em /error. No Tomcat externo, o ErrorPageFilter do WAR
+                        // chega lá por FORWARD: um 403 viraria 401, e o frontend mandaria o usuário para o login.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD).permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
                         // Com SWAGGER_ENABLED=false, estas rotas deixam de existir e respondem 404.
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()

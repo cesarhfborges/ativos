@@ -11,6 +11,7 @@ export const appRoutes: Routes = [
         children: [
             { path: '', title: 'Painel | Ativos', loadComponent: () => import('./app/pages/dashboard/dashboard').then((m) => m.Dashboard) },
             { path: 'carteira', title: 'Carteira | Ativos', loadComponent: () => import('./app/pages/wallet/wallet').then((m) => m.Wallet) },
+            { path: 'acompanhamento', title: 'Acompanhamento | Ativos', loadComponent: () => import('./app/pages/watchlist/watchlist').then((m) => m.Watchlist) },
             { path: 'extrato', title: 'Extrato | Ativos', loadComponent: () => import('./app/pages/statement/statement').then((m) => m.Statement) },
             { path: 'projecoes', title: 'Projeções | Ativos', loadComponent: () => import('./app/pages/projections/projections').then((m) => m.Projections) },
             { path: 'perfil', title: 'Meu perfil | Ativos', loadComponent: () => import('./app/pages/profile/profile').then((m) => m.ProfilePage) },

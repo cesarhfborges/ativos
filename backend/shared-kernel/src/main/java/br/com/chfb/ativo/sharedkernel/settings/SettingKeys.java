@@ -6,6 +6,8 @@ public final class SettingKeys {
     public static final String REGISTRATION_ENABLED = "app.registration-enabled";
     public static final String COLLECTION_ENABLED = "market.collection-enabled";
     public static final String MANUAL_REFRESH_SECONDS = "market.manual-refresh-seconds";
+    public static final String SYNC_LOG_RETENTION_DAYS = "market.sync-log-retention-days";
+    public static final String WATCHLIST_MAX_ITEMS = "watchlist.max-items";
     public static final String MIN_HISTORY_DAYS = "predictive.min-history-days";
     public static final String MIN_OBSERVED_RETURN = "predictive.min-observed-return";
     public static final String MAX_OBSERVED_RETURN = "predictive.max-observed-return";

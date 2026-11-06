@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AdminOverview, AdminSettings, AdminUser, AdminUserCreate, AdminUserUpdate, AssetType, AssetVerification, AuditEntry, CatalogAsset, Page } from './api.models';
+import { AdminOverview, AdminSettings, AdminUser, AdminUserCreate, AdminUserUpdate, AssetType, AssetVerification, AuditEntry, CatalogAsset, Page, SyncItem, SyncRun, SyncRunFilter } from './api.models';
 
 const API = '/api/admin';
 
@@ -16,6 +16,22 @@ export class AdminService {
     /** `refreshed` é falso quando a última coleta foi há menos que o intervalo configurado. */
     collectQuotes(): Observable<{ refreshed: boolean }> {
         return this.http.post<{ refreshed: boolean }>(`${API}/quotes/collect`, null);
+    }
+
+    syncRuns(filter: SyncRunFilter, page: number, size: number): Observable<Page<SyncRun>> {
+        return this.http.get<Page<SyncRun>>(`${API}/sync/runs`, {
+            params: {
+                page,
+                size,
+                ...(filter.status ? { status: filter.status } : {}),
+                ...(filter.origin ? { origin: filter.origin } : {}),
+                ...(filter.symbol.trim() ? { symbol: filter.symbol.trim() } : {})
+            }
+        });
+    }
+
+    syncRunItems(id: string): Observable<SyncItem[]> {
+        return this.http.get<SyncItem[]>(`${API}/sync/runs/${id}/items`);
     }
 
     rebuildPositions(): Observable<{ wallets: number; positions: number }> {

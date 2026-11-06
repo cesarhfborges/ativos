@@ -9,27 +9,24 @@ import br.com.chfb.ativo.assetmanagement.dto.StatementPage;
 import br.com.chfb.ativo.assetmanagement.dto.TransactionResponse;
 import br.com.chfb.ativo.assetmanagement.entity.Amounts;
 import br.com.chfb.ativo.assetmanagement.entity.Asset;
-import br.com.chfb.ativo.assetmanagement.entity.AssetType;
 import br.com.chfb.ativo.assetmanagement.entity.TransactionType;
 import br.com.chfb.ativo.assetmanagement.entity.VerificationStatus;
 import br.com.chfb.ativo.assetmanagement.entity.Wallet;
 import br.com.chfb.ativo.assetmanagement.entity.WalletPosition;
 import br.com.chfb.ativo.assetmanagement.entity.WalletTransaction;
-import br.com.chfb.ativo.assetmanagement.exception.AssetTypeConflictException;
 import br.com.chfb.ativo.assetmanagement.exception.BusinessRuleException;
-import br.com.chfb.ativo.assetmanagement.exception.SymbolNotFoundException;
 import br.com.chfb.ativo.assetmanagement.exception.TransactionNotFoundException;
 import br.com.chfb.ativo.assetmanagement.repository.AssetRepository;
 import br.com.chfb.ativo.assetmanagement.repository.StatementQuery;
 import br.com.chfb.ativo.assetmanagement.repository.WalletPositionRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletRepository;
 import br.com.chfb.ativo.assetmanagement.repository.WalletTransactionRepository;
-import br.com.chfb.ativo.sharedkernel.market.SymbolCheck;
-import br.com.chfb.ativo.sharedkernel.market.SymbolVerifier;
+import br.com.chfb.ativo.sharedkernel.market.SymbolTrackedEvent;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -50,8 +47,9 @@ public class WalletService {
     private final WalletPositionRepository positionRepository;
     private final WalletTransactionRepository transactionRepository;
     private final StatementQuery statementQuery;
-    private final SymbolVerifier symbolVerifier;
+    private final AssetRegistrar assetRegistrar;
     private final TransactionTemplate transactions;
+    private final ApplicationEventPublisher events;
 
     public WalletService(
             WalletRepository walletRepository,
@@ -59,10 +57,12 @@ public class WalletService {
             WalletPositionRepository positionRepository,
             WalletTransactionRepository transactionRepository,
             StatementQuery statementQuery,
-            SymbolVerifier symbolVerifier,
-            PlatformTransactionManager transactionManager) {
+            AssetRegistrar assetRegistrar,
+            PlatformTransactionManager transactionManager,
+            ApplicationEventPublisher events) {
+        this.events = events;
         this.statementQuery = statementQuery;
-        this.symbolVerifier = symbolVerifier;
+        this.assetRegistrar = assetRegistrar;
         this.transactions = new TransactionTemplate(transactionManager);
         this.walletRepository = walletRepository;
         this.assetRepository = assetRepository;
@@ -92,7 +92,7 @@ public class WalletService {
 
     /** O provedor é consultado antes da transação: uma API lenta não pode segurar a trava da carteira. */
     public TransactionResponse buy(UUID userId, BuyOrder order) {
-        VerificationStatus status = verifyNewSymbol(order);
+        VerificationStatus status = assetRegistrar.verifyNew(order.symbol(), order.assetType(), order.acceptUnverified());
         return transactions.execute(transaction -> registerBuy(userId, order, status));
     }
 
@@ -103,7 +103,7 @@ public class WalletService {
         BigDecimal fee = Amounts.money(order.fee());
         BigDecimal total = Amounts.money(quantity.multiply(unitPrice).add(fee));
 
-        Asset asset = findOrRegisterAsset(order, status);
+        Asset asset = assetRegistrar.findOrRegister(order.symbol(), order.name(), order.assetType(), status);
         if (positionRepository.findByWalletIdAndAssetId(wallet.getId(), asset.getId()).isEmpty()) {
             positionRepository.save(new WalletPosition(wallet.getId(), asset));
         }
@@ -111,6 +111,7 @@ public class WalletService {
                 wallet.getId(), asset, quantity, unitPrice, fee, total, order.executedAt()));
 
         rebuildPosition(wallet, asset, INSUFFICIENT_POSITION);
+        events.publishEvent(new SymbolTrackedEvent(asset.getSymbol(), asset.getAssetType().toAssetClass()));
         return result(transaction);
     }
 
@@ -122,7 +123,7 @@ public class WalletService {
         BigDecimal fee = Amounts.money(order.fee());
 
         // Ativo desconhecido e posição inexistente recebem a mesma resposta de custódia insuficiente.
-        Asset asset = assetRepository.findBySymbol(normalizeSymbol(order.symbol()))
+        Asset asset = assetRepository.findBySymbol(AssetRegistrar.normalize(order.symbol()))
                 .orElseThrow(() -> new BusinessRuleException(INSUFFICIENT_POSITION));
         WalletPosition position = positionRepository.findByWalletIdAndAssetId(wallet.getId(), asset.getId())
                 .orElseThrow(() -> new BusinessRuleException(INSUFFICIENT_POSITION));
@@ -216,50 +217,10 @@ public class WalletService {
         });
     }
 
-    /**
-     * Só o primeiro cadastro de um símbolo é conferido. Sem resposta do tipo escolhido, o outro tipo ainda
-     * pode revelar um engano, como BTC lançado como ação quando a Brapi está sem token.
-     */
-    private VerificationStatus verifyNewSymbol(BuyOrder order) {
-        String symbol = normalizeSymbol(order.symbol());
-        if (order.acceptUnverified() || assetRepository.findBySymbol(symbol).isPresent()) {
-            return VerificationStatus.UNVERIFIED;
-        }
-        SymbolCheck chosen = symbolVerifier.verify(symbol, order.assetType().toAssetClass());
-        if (chosen == SymbolCheck.FOUND) {
-            return VerificationStatus.VERIFIED;
-        }
-        AssetType otherType = order.assetType() == AssetType.CRYPTO ? AssetType.STOCK : AssetType.CRYPTO;
-        if (symbolVerifier.verify(symbol, otherType.toAssetClass()) == SymbolCheck.FOUND) {
-            throw new SymbolNotFoundException(symbol, otherType);
-        }
-        if (chosen == SymbolCheck.NOT_FOUND) {
-            throw new SymbolNotFoundException(symbol, null);
-        }
-        return VerificationStatus.UNVERIFIED;
-    }
-
-    private Asset findOrRegisterAsset(BuyOrder order, VerificationStatus status) {
-        String symbol = normalizeSymbol(order.symbol());
-        Asset asset = assetRepository.findBySymbol(symbol).orElseGet(() -> {
-            String name = order.name() == null || order.name().isBlank() ? symbol : order.name().strip();
-            assetRepository.insertIfAbsent(UUID.randomUUID(), symbol, name, order.assetType().name(), status.name());
-            return assetRepository.findBySymbol(symbol).orElseThrow();
-        });
-        if (asset.getAssetType() != order.assetType()) {
-            throw new AssetTypeConflictException(symbol, asset.getAssetType());
-        }
-        return asset;
-    }
-
     /** Valor líquido da venda menos o custo da quantidade vendida. */
     private static BigDecimal realizedProfit(
             BigDecimal quantity, BigDecimal unitPrice, BigDecimal fee, BigDecimal averagePrice) {
         return Amounts.money(quantity.multiply(unitPrice).subtract(fee).subtract(quantity.multiply(averagePrice)));
-    }
-
-    private static String normalizeSymbol(String symbol) {
-        return symbol.toUpperCase(Locale.ROOT);
     }
 
     private TransactionResponse result(WalletTransaction transaction) {

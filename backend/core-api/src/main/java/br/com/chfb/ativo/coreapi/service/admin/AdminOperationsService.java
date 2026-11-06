@@ -93,7 +93,7 @@ public class AdminOperationsService {
                 stale);
     }
 
-    /** Fora de transação: a coleta chama APIs externas. Vale o mesmo limite da atualização pelos usuários. */
+    /** Fora de transação: a coleta chama APIs externas. */
     public boolean collectQuotes(String actorEmail) {
         boolean refreshed = quoteCollector.refresh();
         if (refreshed) {

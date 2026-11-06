@@ -102,4 +102,17 @@ class BinanceMarketProviderTest {
         server.expect(once(), requestTo(containsString("/ticker/price")))
                 .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
     }
+
+    @Test
+    void cotacaoQueFalhaVoltaComOMotivoSemDerrubarAsOutras() {
+        server.expect(requestTo(containsString("symbol=BTCBRL")))
+                .andRespond(withSuccess("{\"symbol\":\"BTCBRL\",\"price\":\"100\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(containsString("symbol=XRPBRL"))).andRespond(withServerError());
+
+        PriceFetch result = provider.fetchCryptoPrices(new java.util.LinkedHashSet<>(java.util.List.of("BTC", "XRP")));
+
+        assertThat(result.prices()).containsOnlyKeys("BTC");
+        assertThat(result.failures()).containsOnlyKeys("XRP");
+        assertThat(result.failures().get("XRP")).contains("500");
+    }
 }

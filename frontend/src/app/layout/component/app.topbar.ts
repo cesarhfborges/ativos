@@ -6,10 +6,11 @@ import { errorMessage } from '@/app/core/api-error';
 import { AuthService } from '@/app/core/auth.service';
 import { ConfirmService } from '@/app/core/confirm.service';
 import { LayoutService } from '@/app/layout/service/layout.service';
+import { SyncIndicator } from '@/app/shared/sync-indicator';
 
 @Component({
     selector: 'app-topbar',
-    imports: [RouterLink, StyleClassModule],
+    imports: [RouterLink, StyleClassModule, SyncIndicator],
     template: `<header class="layout-topbar">
         <div class="layout-topbar-logo-container">
             <button type="button" class="layout-menu-button layout-topbar-action" aria-label="Alternar menu de navegação" [attr.aria-expanded]="layoutService.isMenuVisible()" (click)="layoutService.toggleMenu()">
@@ -17,11 +18,12 @@ import { LayoutService } from '@/app/layout/service/layout.service';
             </button>
             <a class="layout-topbar-logo" routerLink="/">
                 <i class="pi pi-chart-line text-primary text-2xl!" aria-hidden="true"></i>
-                <span>Ativos</span>
+                <span class="hidden sm:inline">Ativos</span>
             </a>
         </div>
 
         <div class="layout-topbar-actions">
+            <app-sync-indicator class="flex items-center min-w-0" />
             <div class="layout-config-menu">
                 <button type="button" class="layout-topbar-action" [attr.aria-label]="layoutService.isDarkTheme() ? 'Usar tema claro' : 'Usar tema escuro'" (click)="layoutService.toggleDarkTheme()">
                     <i class="pi" [class.pi-moon]="layoutService.isDarkTheme()" [class.pi-sun]="!layoutService.isDarkTheme()" aria-hidden="true"></i>

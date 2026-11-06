@@ -237,7 +237,7 @@ export interface AdminOverview {
     wallets: number;
     transactions: number;
     collectionEnabled: boolean;
-    /** Coleta mais recente desde que a aplicação iniciou. */
+    /** Última coleta geral que atualizou preços. */
     lastCollectedAt: string | null;
     activeSymbols: number;
     symbolsWithoutQuote: string[];
@@ -270,6 +270,79 @@ export interface SystemInfo {
 export interface AdminSettings {
     settings: AdminSetting[];
     system: SystemInfo;
+}
+
+/** O que o usuário espera do ativo. Preço nulo significa que ele não o definiu. */
+export interface WatchlistPlan {
+    buyBelow: number | null;
+    sellAbove: number | null;
+    stopLoss: number | null;
+    note: string | null;
+}
+
+export interface AddWatchlistItem extends WatchlistPlan {
+    symbol: string;
+    name?: string;
+    assetType: AssetType;
+    acceptUnverified: boolean;
+}
+
+/** Sem posição aberta, `quantity` é zero e `averagePrice` é nulo. Sem cotação, os dados de mercado são nulos. */
+export interface WatchlistItem extends WatchlistPlan {
+    id: string;
+    symbol: string;
+    name: string;
+    assetType: AssetType;
+    currentPrice: number | null;
+    quoteUpdatedAt: string | null;
+    change24hPercent: number | null;
+    periodChangePercent: number | null;
+    periodLow: number | null;
+    periodHigh: number | null;
+    prices: PricePoint[];
+    quantity: number;
+    averagePrice: number | null;
+    createdAt: string;
+}
+
+export interface SyncStatus {
+    /** Última coleta geral que atualizou preços; nula se nunca houve. */
+    lastSyncAt: string | null;
+    /** Nula com a coleta pausada ou sem agendamento. */
+    nextSyncAt: string | null;
+    lastRunFailed: boolean;
+    collectionEnabled: boolean;
+}
+
+export type SyncOrigin = 'SCHEDULED' | 'STARTUP' | 'ADMIN' | 'NEW_SYMBOL';
+export type SyncRunStatus = 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'INTERRUPTED';
+export type SyncItemStatus = 'UPDATED' | 'NO_DATA' | 'FAILED';
+
+export interface SyncRun {
+    id: string;
+    origin: SyncOrigin;
+    status: SyncRunStatus;
+    startedAt: string;
+    finishedAt: string | null;
+    requestedSymbols: number;
+    updatedSymbols: number;
+    message: string | null;
+}
+
+export interface SyncItem {
+    symbol: string;
+    assetClass: 'STOCK' | 'CRYPTO';
+    kind: 'QUOTE' | 'HISTORY';
+    status: SyncItemStatus;
+    /** Fechamentos gravados, só na carga de histórico. */
+    points: number | null;
+    message: string | null;
+}
+
+export interface SyncRunFilter {
+    status: SyncRunStatus | null;
+    origin: SyncOrigin | null;
+    symbol: string;
 }
 
 export interface AuditEntry {

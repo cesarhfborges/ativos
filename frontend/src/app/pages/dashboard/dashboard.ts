@@ -2,17 +2,18 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { catchError, combineLatest, forkJoin, of, startWith, Subject, switchMap, tap } from 'rxjs';
+import { catchError, forkJoin, of, switchMap, tap } from 'rxjs';
 import { RouterLink } from '@angular/router';
-import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { MessageModule } from 'primeng/message';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { SkeletonModule } from 'primeng/skeleton';
-import { DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, Transaction } from '@/app/core/api.models';
+import { DashboardOverview, DashboardPosition, MarketAsset, PortfolioHistoryPoint, Transaction, WatchlistItem } from '@/app/core/api.models';
 import { errorMessage } from '@/app/core/api-error';
-import { composition, periodChanges, resultByAsset } from '@/app/core/market';
+import { composition, MARKET_PERIODS, periodChanges, resultByAsset } from '@/app/core/market';
 import { allocation } from '@/app/core/portfolio';
+import { portfolioRadar } from '@/app/core/portfolio-radar';
+import { WatchlistService } from '@/app/core/watchlist.service';
 import { WalletService } from '@/app/core/wallet.service';
 import { PositionsTable } from '@/app/shared/positions-table';
 import { ProfitLoss } from '@/app/shared/profit-loss';
@@ -22,17 +23,14 @@ import { AllocationChart } from './components/allocation-chart';
 import { AssetPerformanceChart } from './components/asset-performance-chart';
 import { HistoryChart } from './components/history-chart';
 import { MarketHighlights } from './components/market-highlights';
+import { PortfolioRadarChart } from './components/portfolio-radar-chart';
 import { RankedBars } from './components/ranked-bars';
+import { ReachedTargets } from './components/reached-targets';
 import { ReturnChart } from './components/return-chart';
 
 const RECENT_SIZE = 5;
 
-const PERIODS = [
-    { label: '7 dias', value: 7 },
-    { label: '30 dias', value: 30 },
-    { label: '90 dias', value: 90 },
-    { label: '1 ano', value: 365 }
-];
+const PERIODS = MARKET_PERIODS;
 
 const signed = (value: number, text: string) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${text}`;
 const decimal = (value: number, digits: number) => Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -48,9 +46,11 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
         HistoryChart,
         MarketHighlights,
         MessageModule,
+        PortfolioRadarChart,
         PositionsTable,
         ProfitLoss,
         RankedBars,
+        ReachedTargets,
         RecentTransactions,
         ReturnChart,
         RouterLink,
@@ -67,7 +67,6 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
                 }
             </div>
             <div class="flex flex-wrap gap-2">
-                <p-button label="Atualizar cotações" icon="pi pi-refresh" severity="secondary" [text]="true" [disabled]="!overview()" [loading]="refreshing()" (onClick)="refreshQuotes()" />
                 <a pButton routerLink="/carteira"><i class="pi pi-wallet" pButtonIcon aria-hidden="true"></i><span pButtonLabel>Gerir carteira</span></a>
             </div>
         </div>
@@ -124,6 +123,12 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
                     <app-market-highlights [positions]="positions()" [market]="market()" />
                 </section>
 
+                @if (watchlist(); as items) {
+                    <section class="col-span-12" aria-label="Alvos do plano">
+                        <app-reached-targets [items]="items" />
+                    </section>
+                }
+
                 <div class="col-span-12 flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h2 id="period-title" class="text-xl! font-semibold m-0!">Período de análise</h2>
@@ -151,6 +156,10 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
                     </section>
                     <section class="col-span-12 xl:col-span-4">
                         <app-ranked-bars heading="Variação dos ativos" [description]="'Alta ou queda do preço em ' + periodLabel() + '.'" emptyMessage="Ainda não há preços suficientes neste período." [items]="changes()" [format]="formatPercent" [signed]="true" />
+                    </section>
+
+                    <section class="col-span-12">
+                        <app-portfolio-radar-chart [axes]="radarAxes()" />
                     </section>
 
                     <section class="col-span-12 xl:col-span-8">
@@ -186,28 +195,28 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
 })
 export class Dashboard {
     private readonly wallet = inject(WalletService);
-    private readonly messages = inject(MessageService);
+    private readonly watchlistService = inject(WatchlistService);
 
     protected readonly overview = signal<DashboardOverview | null>(null);
     protected readonly positions = signal<DashboardPosition[]>([]);
     protected readonly recent = signal<Transaction[]>([]);
     protected readonly history = signal<PortfolioHistoryPoint[]>([]);
     protected readonly market = signal<MarketAsset[]>([]);
+    /** Nulo sem resposta: é secundário, e o restante do painel continua útil sem ele. */
+    protected readonly watchlist = signal<WatchlistItem[] | null>(null);
     protected readonly marketFailed = signal(false);
     protected readonly periods = PERIODS;
     protected readonly days = signal(30);
     protected readonly periodLoading = signal(false);
     protected readonly loading = signal(false);
-    protected readonly refreshing = signal(false);
     protected readonly failure = signal<string | null>(null);
-
-    private readonly reloadPeriod = new Subject<void>();
 
     protected readonly periodLabel = computed(() => PERIODS.find((period) => period.value === this.days())?.label ?? '');
     protected readonly slices = computed(() => allocation(this.positions()));
     protected readonly changes = computed(() => periodChanges(this.market()));
     protected readonly assetShares = computed(() => composition(this.positions()));
     protected readonly results = computed(() => resultByAsset(this.positions()));
+    protected readonly radarAxes = computed(() => portfolioRadar(this.positions(), this.market(), this.watchlist(), this.periodLabel()));
 
     protected readonly formatPercent = (value: number) => signed(value, `${decimal(value, 2)}%`);
     protected readonly formatShare = (value: number) => `${decimal(value, 1)}%`;
@@ -216,17 +225,19 @@ export class Dashboard {
     protected readonly withoutQuoteMessage = computed(() => {
         const count = this.overview()?.positionsWithoutQuote ?? 0;
         return count === 1
-            ? '1 posição ainda não tem cotação e está avaliada pelo preço médio, sem lucro ou prejuízo. Use "Atualizar cotações" para buscar agora.'
-            : `${count} posições ainda não têm cotação e estão avaliadas pelo preço médio, sem lucro ou prejuízo. Use "Atualizar cotações" para buscar agora.`;
+            ? '1 posição ainda não tem cotação e está avaliada pelo preço médio, sem lucro ou prejuízo. A cotação é buscada logo após a compra e nas sincronizações automáticas.'
+            : `${count} posições ainda não têm cotação e estão avaliadas pelo preço médio, sem lucro ou prejuízo. A cotação é buscada logo após a compra e nas sincronizações automáticas.`;
     });
 
     constructor() {
         this.load();
+        // Só os alvos e o plano interessam aqui: o período mais curto traz menos pontos de preço.
+        this.watchlistService.list(1).subscribe({ next: (items) => this.watchlist.set(items), error: () => undefined });
         // switchMap descarta a resposta do período anterior, que poderia chegar depois da do atual.
-        combineLatest([toObservable(this.days), this.reloadPeriod.pipe(startWith(undefined))])
+        toObservable(this.days)
             .pipe(
                 tap(() => this.periodLoading.set(true)),
-                switchMap(([days]) =>
+                switchMap((days) =>
                     forkJoin({
                         // Estes dados são secundários: sem eles, o restante do painel continua útil.
                         history: this.wallet.history(days).pipe(catchError(() => of<PortfolioHistoryPoint[]>([]))),
@@ -260,26 +271,6 @@ export class Dashboard {
             error: (error: unknown) => {
                 this.failure.set(errorMessage(error));
                 this.loading.set(false);
-            }
-        });
-    }
-
-    protected refreshQuotes(): void {
-        this.refreshing.set(true);
-        this.wallet.refreshQuotes().subscribe({
-            next: ({ refreshed }) => {
-                this.refreshing.set(false);
-                this.messages.add(
-                    refreshed
-                        ? { severity: 'success', closable: false, summary: 'Cotações atualizadas' }
-                        : { severity: 'info', closable: false, summary: 'Cotações já atualizadas', detail: 'A última coleta foi há menos de um minuto. Para buscar um ativo recém-comprado, tente de novo em instantes.' }
-                );
-                this.load();
-                this.reloadPeriod.next();
-            },
-            error: (error: unknown) => {
-                this.refreshing.set(false);
-                this.messages.add({ severity: 'error', closable: false, summary: 'Não foi possível atualizar', detail: errorMessage(error) });
             }
         });
     }

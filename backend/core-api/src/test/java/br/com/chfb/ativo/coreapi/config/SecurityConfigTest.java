@@ -10,7 +10,8 @@ import br.com.chfb.ativo.assetmanagement.service.AssetCatalogService;
 import br.com.chfb.ativo.assetmanagement.service.DashboardService;
 import br.com.chfb.ativo.assetmanagement.service.MarketOverviewService;
 import br.com.chfb.ativo.assetmanagement.service.WalletService;
-import br.com.chfb.ativo.markettracker.service.QuoteCollector;
+import br.com.chfb.ativo.assetmanagement.service.WatchlistService;
+import br.com.chfb.ativo.markettracker.service.SyncLog;
 import br.com.chfb.ativo.sharedkernel.market.AssetSearch;
 import br.com.chfb.ativo.predictiveengine.service.PredictionService;
 import br.com.chfb.ativo.coreapi.service.AuthService;
@@ -48,7 +49,10 @@ class SecurityConfigTest {
     private MarketOverviewService marketOverviewService;
 
     @MockitoBean
-    private QuoteCollector quoteCollector;
+    private SyncLog syncLog;
+
+    @MockitoBean
+    private WatchlistService watchlistService;
 
     @MockitoBean
     private PredictionService predictionService;

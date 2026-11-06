@@ -10,6 +10,7 @@ import br.com.chfb.ativo.sharedkernel.market.QuoteLookup;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,7 +42,12 @@ public class MarketOverviewService {
                         .map(position -> position.getAsset().getSymbol())
                         .toList())
                 .orElseGet(List::of);
+        return List.copyOf(bySymbols(symbols, days).values());
+    }
 
+    /** Os dados de mercado de quaisquer símbolos, na ordem pedida. Todos aparecem, mesmo sem nenhum preço. */
+    @Transactional(readOnly = true)
+    public Map<String, MarketAssetResponse> bySymbols(List<String> symbols, int days) {
         Instant now = Instant.now();
         PriceResolution resolution = days <= MAX_DAYS_HOURLY ? PriceResolution.HOUR : PriceResolution.DAY;
         Map<String, Quote> quotes = quoteLookup.findBySymbols(symbols);
@@ -49,9 +55,9 @@ public class MarketOverviewService {
         Map<String, List<PricePoint>> history =
                 quoteLookup.findPriceHistory(symbols, now.minus(Duration.ofDays(days)), resolution);
 
-        return symbols.stream()
-                .map(symbol -> MarketAssetResponse.of(
-                        symbol, quotes.get(symbol), prices24hAgo.get(symbol), history.getOrDefault(symbol, List.of())))
-                .toList();
+        Map<String, MarketAssetResponse> market = new LinkedHashMap<>();
+        symbols.forEach(symbol -> market.put(symbol, MarketAssetResponse.of(
+                symbol, quotes.get(symbol), prices24hAgo.get(symbol), history.getOrDefault(symbol, List.of()))));
+        return market;
     }
 }

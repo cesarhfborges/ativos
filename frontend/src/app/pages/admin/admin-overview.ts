@@ -20,7 +20,6 @@ import { ConfirmService } from '@/app/core/confirm.service';
                 <p class="text-surface-600 dark:text-surface-300 m-0! mt-1!">Totais do sistema e saúde das cotações. As carteiras de cada usuário continuam privadas.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <p-button label="Coletar cotações" icon="pi pi-refresh" severity="secondary" [outlined]="true" [loading]="collecting()" (onClick)="collect()" />
                 <p-button label="Recalcular posições" icon="pi pi-calculator" severity="secondary" [outlined]="true" [loading]="rebuilding()" (onClick)="rebuild()" />
             </div>
         </div>
@@ -43,7 +42,10 @@ import { ConfirmService } from '@/app/core/confirm.service';
                 </section>
 
                 <section class="card mb-0!" aria-labelledby="admin-quotes-title">
-                    <h2 id="admin-quotes-title" class="text-xl! font-semibold mt-0! mb-4!">Cotações</h2>
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <h2 id="admin-quotes-title" class="text-xl! font-semibold m-0!">Cotações</h2>
+                        <a routerLink="/admin/sincronizacao" class="underline font-medium">Ver sincronização</a>
+                    </div>
                     @if (!data.collectionEnabled) {
                         <p-message severity="warn" styleClass="mb-4">
                             A coleta automática está pausada. Para retomar, acesse&nbsp;<a routerLink="/admin/configuracoes" class="underline font-medium">Configurações</a>.
@@ -51,11 +53,11 @@ import { ConfirmService } from '@/app/core/confirm.service';
                     }
                     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 m-0">
                         <div>
-                            <dt class="text-muted-color text-sm">Última coleta desde que o sistema iniciou</dt>
+                            <dt class="text-muted-color text-sm">Última coleta</dt>
                             <dd class="m-0 font-medium">{{ data.lastCollectedAt ? (data.lastCollectedAt | date: 'short') : 'Nenhuma ainda' }}</dd>
                         </div>
                         <div>
-                            <dt class="text-muted-color text-sm">Símbolos com posição aberta</dt>
+                            <dt class="text-muted-color text-sm">Símbolos coletados</dt>
                             <dd class="m-0 font-medium">{{ data.activeSymbols | number }}</dd>
                         </div>
                         <div>
@@ -81,7 +83,6 @@ export class AdminOverviewPage {
 
     protected readonly overview = signal<AdminOverview | null>(null);
     protected readonly failure = signal<string | null>(null);
-    protected readonly collecting = signal(false);
     protected readonly rebuilding = signal(false);
 
     protected readonly cards = computed(() => {
@@ -107,25 +108,6 @@ export class AdminOverviewPage {
                 this.failure.set(null);
             },
             error: (error: unknown) => this.failure.set(errorMessage(error))
-        });
-    }
-
-    protected collect(): void {
-        this.collecting.set(true);
-        this.admin.collectQuotes().subscribe({
-            next: ({ refreshed }) => {
-                this.collecting.set(false);
-                this.messages.add(
-                    refreshed
-                        ? { severity: 'success', closable: false, summary: 'Cotações atualizadas' }
-                        : { severity: 'info', closable: false, summary: 'Coleta recente', detail: 'Aguarde o intervalo mínimo entre coletas.' }
-                );
-                this.load();
-            },
-            error: (error: unknown) => {
-                this.collecting.set(false);
-                this.messages.add({ severity: 'error', closable: false, summary: 'Não foi possível coletar', detail: errorMessage(error) });
-            }
         });
     }
 

@@ -39,6 +39,8 @@ public class BrapiMarketProvider implements StockMarketProvider {
      */
     private static final Duration MIDNIGHT_TO_CLOSE = Duration.ofHours(18);
 
+    private static final String NO_PRICE = "A Brapi não devolveu preço";
+
     private final RestClient restClient;
     private final String baseUrl;
     private final String token;
@@ -87,8 +89,9 @@ public class BrapiMarketProvider implements StockMarketProvider {
     }
 
     @Override
-    public Map<String, BigDecimal> fetchStockPrices(Set<String> symbols) {
+    public PriceFetch fetchStockPrices(Set<String> symbols) {
         Map<String, BigDecimal> prices = new HashMap<>();
+        Map<String, String> failures = new HashMap<>();
         for (String symbol : symbols) {
             try {
                 QuoteResponse response = restClient.get()
@@ -100,17 +103,20 @@ public class BrapiMarketProvider implements StockMarketProvider {
                         })
                         .retrieve()
                         .body(QuoteResponse.class);
-                if (response != null && response.results() != null && !response.results().isEmpty()) {
-                    BigDecimal price = response.results().get(0).regularMarketPrice();
-                    if (price != null) {
-                        prices.put(symbol, price);
-                    }
+                BigDecimal price = response == null || response.results() == null || response.results().isEmpty()
+                        ? null
+                        : response.results().get(0).regularMarketPrice();
+                if (price != null) {
+                    prices.put(symbol, price);
+                } else {
+                    failures.put(symbol, NO_PRICE);
                 }
             } catch (RestClientException e) {
                 log.warn("Brapi sem cotação para {}: {}", symbol, e.getMessage());
+                failures.put(symbol, e.getMessage());
             }
         }
-        return prices;
+        return new PriceFetch(prices, failures);
     }
 
     /** Sem token, a Brapi responde 401 até para ações reais: só o 404 diz que o símbolo não existe. */

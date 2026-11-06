@@ -8,6 +8,7 @@ import br.com.chfb.ativo.sharedkernel.market.Quote;
 import br.com.chfb.ativo.sharedkernel.market.QuoteLookup;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Service;
 public class QuoteStore implements QuoteLookup {
 
     private static final int PRICE_SCALE = 8;
+    private static final Duration BACKFILL_AGE = Duration.ofDays(1);
+    private static final Duration MAX_GAP = Duration.ofDays(2);
 
     private final MarketQuoteRepository repository;
     private final MarketQuoteHistoryRepository historyRepository;
@@ -69,8 +72,15 @@ public class QuoteStore implements QuoteLookup {
                 .toList());
     }
 
-    Set<String> symbolsWithHistoryUntil(Collection<String> symbols, Instant at) {
-        return symbols.isEmpty() ? Set.of() : historyRepository.findSymbolsWithHistoryUntil(symbols, at);
+    /**
+     * Quem não aparece aqui recebe a carga de fechamentos diários: nunca teve preço mais antigo que
+     * {@link #BACKFILL_AGE} ou está sem preços há mais de {@link #MAX_GAP}, como um ativo que voltou a ser coletado.
+     * Se a carga falhar, é refeita nas próximas coletas; um símbolo que o provedor nunca cota continua sendo tentado.
+     */
+    Set<String> symbolsWithContinuousHistory(Collection<String> symbols, Instant now) {
+        return symbols.isEmpty()
+                ? Set.of()
+                : historyRepository.findSymbolsWithHistorySince(symbols, now.minus(BACKFILL_AGE), now.minus(MAX_GAP));
     }
 
     private static BigDecimal scaled(BigDecimal price) {

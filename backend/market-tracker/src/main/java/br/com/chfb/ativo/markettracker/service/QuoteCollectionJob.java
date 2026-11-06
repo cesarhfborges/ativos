@@ -1,6 +1,8 @@
 package br.com.chfb.ativo.markettracker.service;
 
+import br.com.chfb.ativo.markettracker.entity.SyncOrigin;
 import br.com.chfb.ativo.sharedkernel.market.QuotesCollectedEvent;
+import br.com.chfb.ativo.sharedkernel.market.SymbolTrackedEvent;
 import br.com.chfb.ativo.sharedkernel.settings.AppSettings;
 import br.com.chfb.ativo.sharedkernel.settings.SettingKeys;
 import java.time.Instant;
@@ -11,6 +13,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
 public class QuoteCollectionJob {
@@ -20,13 +24,16 @@ public class QuoteCollectionJob {
     private final TaskScheduler scheduler;
     private final boolean collectOnStartup;
     private final AppSettings appSettings;
+    private final SyncLog syncLog;
 
     public QuoteCollectionJob(
             QuoteCollector collector,
             ApplicationEventPublisher events,
             TaskScheduler scheduler,
             @Value("${market.collect-on-startup}") boolean collectOnStartup,
-            AppSettings appSettings) {
+            AppSettings appSettings,
+            SyncLog syncLog) {
+        this.syncLog = syncLog;
         this.appSettings = appSettings;
         this.collector = collector;
         this.events = events;
@@ -38,16 +45,24 @@ public class QuoteCollectionJob {
     @Scheduled(cron = "${market.collection-cron}")
     public void collectHourly() {
         if (collectionEnabled()) {
-            events.publishEvent(new QuotesCollectedEvent(collector.collect()));
+            events.publishEvent(new QuotesCollectedEvent(collector.collect(SyncOrigin.SCHEDULED)));
+            syncLog.purge();
         }
     }
 
     /** Em outra thread: as chamadas externas não podem atrasar o início da aplicação. */
     @EventListener(ApplicationReadyEvent.class)
     public void collectOnStartup() {
+        syncLog.markInterrupted();
         if (collectOnStartup && collectionEnabled()) {
-            scheduler.schedule(collector::collect, Instant.now());
+            scheduler.schedule(() -> collector.collect(SyncOrigin.STARTUP), Instant.now());
         }
+    }
+
+    /** Depois do commit, para enxergar a compra, e em outra thread: a chamada externa não pode atrasar a resposta. */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onSymbolTracked(SymbolTrackedEvent event) {
+        scheduler.schedule(() -> collector.collectNewSymbol(event.symbol(), event.assetClass()), Instant.now());
     }
 
     private boolean collectionEnabled() {

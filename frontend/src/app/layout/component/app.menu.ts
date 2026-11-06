@@ -43,6 +43,7 @@ export class AppMenu {
         { label: 'Visão geral', icon: 'pi pi-fw pi-gauge', link: '/admin' },
         { label: 'Usuários', icon: 'pi pi-fw pi-users', link: '/admin/usuarios' },
         { label: 'Ativos', icon: 'pi pi-fw pi-database', link: '/admin/ativos' },
+        { label: 'Sincronização', icon: 'pi pi-fw pi-sync', link: '/admin/sincronizacao' },
         { label: 'Configurações', icon: 'pi pi-fw pi-cog', link: '/admin/configuracoes' },
         { label: 'Auditoria', icon: 'pi pi-fw pi-history', link: '/admin/auditoria' }
     ];
@@ -50,6 +51,7 @@ export class AppMenu {
     protected readonly items = [
         { label: 'Painel', icon: 'pi pi-fw pi-home', link: '/' },
         { label: 'Carteira', icon: 'pi pi-fw pi-wallet', link: '/carteira' },
+        { label: 'Acompanhamento', icon: 'pi pi-fw pi-eye', link: '/acompanhamento' },
         { label: 'Extrato', icon: 'pi pi-fw pi-list', link: '/extrato' },
         { label: 'Projeções', icon: 'pi pi-fw pi-chart-line', link: '/projecoes' },
         { label: 'Meu perfil', icon: 'pi pi-fw pi-user', link: '/perfil' }

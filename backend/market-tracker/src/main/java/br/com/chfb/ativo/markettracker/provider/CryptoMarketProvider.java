@@ -3,16 +3,14 @@ package br.com.chfb.ativo.markettracker.provider;
 import br.com.chfb.ativo.sharedkernel.market.AssetSearchResult;
 import br.com.chfb.ativo.sharedkernel.market.PricePoint;
 import br.com.chfb.ativo.sharedkernel.market.SymbolCheck;
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /** A implementação ativa é escolhida por {@code market.provider.crypto}. */
 public interface CryptoMarketProvider {
 
     /** Pode devolver menos símbolos que os pedidos: os que falharem mantêm a última cotação conhecida. */
-    Map<String, BigDecimal> fetchCryptoPrices(Set<String> symbols);
+    PriceFetch fetchCryptoPrices(Set<String> symbols);
 
     /** Fechamentos diários do último ano, só de dias encerrados. Vazio se o provedor não tiver o símbolo. */
     List<PricePoint> fetchCryptoDailyCloses(String symbol);

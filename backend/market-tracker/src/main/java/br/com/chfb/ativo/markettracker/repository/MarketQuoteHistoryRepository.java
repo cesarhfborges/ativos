@@ -102,11 +102,19 @@ public class MarketQuoteHistoryRepository {
         return prices;
     }
 
-    /** Símbolos com algum registro até {@code at}. */
-    public Set<String> findSymbolsWithHistoryUntil(Collection<String> symbols, Instant at) {
+    /** Símbolos com algum registro até {@code oldest} e o mais recente a partir de {@code latest}. */
+    public Set<String> findSymbolsWithHistorySince(Collection<String> symbols, Instant oldest, Instant latest) {
         return new HashSet<>(namedJdbc.queryForList(
-                "SELECT DISTINCT symbol FROM market_quote_history WHERE symbol IN (:symbols) AND quoted_at <= :at",
-                new MapSqlParameterSource().addValue("symbols", symbols).addValue("at", Timestamp.from(at)),
+                """
+                SELECT symbol FROM market_quote_history
+                WHERE symbol IN (:symbols)
+                GROUP BY symbol
+                HAVING min(quoted_at) <= :oldest AND max(quoted_at) >= :latest
+                """,
+                new MapSqlParameterSource()
+                        .addValue("symbols", symbols)
+                        .addValue("oldest", Timestamp.from(oldest))
+                        .addValue("latest", Timestamp.from(latest)),
                 String.class));
     }
 }

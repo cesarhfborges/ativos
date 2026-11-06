@@ -102,7 +102,7 @@ export class AssetLookupDialog {
             // A cotação das criptos é em reais: um par em outra moeda ficaria sem preço na carteira.
             return this.formValue().type === 'CRYPTO' ? 'Nenhum ativo encontrado. Só aparecem as criptos negociadas em reais.' : 'Nenhum ativo encontrado.';
         }
-        return `${count === 1 ? '1 ativo encontrado' : `${count} ativos encontrados`}. Escolha um para preencher a compra.`;
+        return `${count === 1 ? '1 ativo encontrado' : `${count} ativos encontrados`}. Escolha um para preencher os dados.`;
     });
 
     constructor() {

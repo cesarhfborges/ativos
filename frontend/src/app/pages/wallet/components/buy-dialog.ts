@@ -20,7 +20,7 @@ import { ConfirmService } from '@/app/core/confirm.service';
 import { DatePickerLabels } from '@/app/core/date-picker-labels';
 import { dateClause, toInstant } from '@/app/core/operation-date';
 import { WalletService } from '@/app/core/wallet.service';
-import { AssetLookupDialog } from './asset-lookup-dialog';
+import { AssetLookupDialog } from '@/app/shared/asset-lookup-dialog';
 
 type ControlName = 'symbol' | 'name' | 'amount' | 'quantity' | 'unitPrice' | 'fee' | 'executedAt';
 /** Em cripto é comum comprar um valor em reais; a quantidade é o que sobra dele depois da taxa. */
@@ -219,6 +219,8 @@ export class BuyDialog {
     readonly visible = model(false);
     /** Com uma posição, o ativo já está definido e só faltam os dados da compra. */
     readonly position = input<Position | null>(null);
+    /** Sem posição, começa a compra com este ativo e sua cotação já preenchidos. */
+    readonly asset = input<AssetCandidate | null>(null);
     readonly completed = output<Transaction>();
     readonly closed = output<void>();
 
@@ -357,7 +359,13 @@ export class BuyDialog {
         effect(() => {
             if (this.visible()) {
                 const position = this.position();
-                untracked(() => this.reset(position));
+                const asset = this.asset();
+                untracked(() => {
+                    this.reset(position);
+                    if (asset && !position) {
+                        this.applyCandidate(asset);
+                    }
+                });
             }
         });
     }

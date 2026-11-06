@@ -1,15 +1,17 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { MessageModule } from 'primeng/message';
 import { SkeletonModule } from 'primeng/skeleton';
-import { DashboardPosition, Position, Transaction } from '@/app/core/api.models';
+import { Asset, DashboardPosition, Position, Transaction, WatchlistItem } from '@/app/core/api.models';
 import { errorMessage } from '@/app/core/api-error';
 import { TransactionReversalService } from '@/app/core/transaction-reversal.service';
 import { WalletService } from '@/app/core/wallet.service';
+import { WatchlistService } from '@/app/core/watchlist.service';
 import { PositionsTable } from '@/app/shared/positions-table';
 import { RecentTransactions } from '@/app/shared/recent-transactions';
+import { WatchlistPlanDialog } from '@/app/pages/watchlist/components/watchlist-plan-dialog';
 import { BuyDialog } from './components/buy-dialog';
 import { SellDialog } from './components/sell-dialog';
 
@@ -18,7 +20,7 @@ const RECENT_SIZE = 10;
 /** Onde as compras e vendas são lançadas. O acompanhamento fica no Painel. */
 @Component({
     selector: 'app-wallet',
-    imports: [BuyDialog, ButtonModule, MessageModule, PositionsTable, RecentTransactions, SellDialog, SkeletonModule],
+    imports: [BuyDialog, ButtonModule, MessageModule, PositionsTable, RecentTransactions, SellDialog, SkeletonModule, WatchlistPlanDialog],
     template: `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div>
@@ -41,7 +43,7 @@ const RECENT_SIZE = 10;
                 <section aria-labelledby="wallet-positions-title">
                     <div class="card mb-0!">
                         <h2 id="wallet-positions-title" class="text-xl! font-semibold mt-0! mb-6!">Posições</h2>
-                        <app-positions-table [manageable]="true" [positions]="positions()" [total]="total()" (buy)="openBuy($event)" (sell)="openSell($event)" />
+                        <app-positions-table [manageable]="true" [positions]="positions()" [total]="total()" [plans]="plans()" (buy)="openBuy($event)" (sell)="openSell($event)" (plan)="openPlan($event)" />
                     </div>
                 </section>
                 <section>
@@ -54,10 +56,12 @@ const RECENT_SIZE = 10;
 
         <app-buy-dialog [position]="selected()" [(visible)]="buyVisible" (completed)="onBuyCompleted($event)" (closed)="restoreFocus()" />
         <app-sell-dialog [position]="selected()" [positions]="positions()" [(visible)]="sellVisible" (completed)="onSellCompleted($event)" (closed)="restoreFocus()" />
+        <app-watchlist-plan-dialog [item]="planItem()" [asset]="planAsset()" [(visible)]="planVisible" (saved)="onPlanSaved($event)" (closed)="restoreFocus()" />
     `
 })
 export class Wallet {
     private readonly wallet = inject(WalletService);
+    private readonly watchlist = inject(WatchlistService);
     private readonly messages = inject(MessageService);
     private readonly reversal = inject(TransactionReversalService);
 
@@ -73,6 +77,10 @@ export class Wallet {
     protected readonly buyVisible = signal(false);
     protected readonly sellVisible = signal(false);
     protected readonly selected = signal<Position | null>(null);
+    protected readonly plans = signal<WatchlistItem[]>([]);
+    protected readonly planVisible = signal(false);
+    protected readonly planItem = signal<WatchlistItem | null>(null);
+    protected readonly planAsset = signal<(Asset & { price: number | null; averagePrice: number | null }) | null>(null);
 
     protected readonly total = computed(() => this.positions().reduce((sum, position) => sum + position.marketValue, 0));
 
@@ -82,8 +90,14 @@ export class Wallet {
 
     protected load(): void {
         this.loading.set(true);
-        forkJoin({ positions: this.wallet.positions(), recent: this.wallet.recentTransactions(RECENT_SIZE) }).subscribe({
-            next: ({ positions, recent }) => {
+        forkJoin({
+            positions: this.wallet.positions(),
+            recent: this.wallet.recentTransactions(RECENT_SIZE),
+            // Secundário: sem os planos, a carteira continua funcionando.
+            plans: this.watchlist.list(1).pipe(catchError(() => of<WatchlistItem[]>([])))
+        }).subscribe({
+            next: ({ positions, recent, plans }) => {
+                this.plans.set(plans);
                 this.positions.set(positions);
                 this.recent.set(recent);
                 this.loaded.set(true);
@@ -107,6 +121,20 @@ export class Wallet {
         this.rememberFocus();
         this.selected.set(position);
         this.sellVisible.set(true);
+    }
+
+    /** Definir um plano aqui também coloca o ativo no Acompanhamento. */
+    protected openPlan(position: DashboardPosition): void {
+        this.rememberFocus();
+        const { symbol, name, assetType, currentPrice, averagePrice } = position;
+        const item = this.plans().find((plan) => plan.symbol === symbol) ?? null;
+        this.planItem.set(item);
+        this.planAsset.set(item ? null : { symbol, name, assetType, price: currentPrice, averagePrice });
+        this.planVisible.set(true);
+    }
+
+    protected onPlanSaved(item: WatchlistItem): void {
+        this.notify(`Plano de ${item.symbol} salvo`);
     }
 
     protected restoreFocus(): void {

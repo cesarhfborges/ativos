@@ -34,8 +34,8 @@ const PAGE_SIZE = 20;
             @if (failure(); as message) {
                 <p-message severity="error" [text]="message" styleClass="mb-4" />
             }
-            <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Lista de usuários">
-                <p-table class="block min-w-[60rem]" dataKey="id" [value]="users()" [lazy]="true" [paginator]="true" [rows]="pageSize" [totalRecords]="total()" [loading]="loading()" (onLazyLoad)="onPage($event)">
+            <div class="stack-table stack-66">
+                <p-table dataKey="id" [value]="users()" [lazy]="true" [paginator]="true" [rows]="pageSize" [totalRecords]="total()" [loading]="loading()" (onLazyLoad)="onPage($event)">
                     <ng-template #header>
                         <tr>
                             <th scope="col">Nome</th>
@@ -47,14 +47,14 @@ const PAGE_SIZE = 20;
                     </ng-template>
                     <ng-template #body let-user>
                         <tr>
-                            <td>
+                            <td class="stack-full">
                                 <div class="font-medium">{{ user.name }}</div>
                                 <div class="text-muted-color text-sm">{{ user.email }}</div>
                             </td>
-                            <td><p-tag [value]="user.role === 'ADMIN' ? 'Administrador' : 'Usuário'" [severity]="user.role === 'ADMIN' ? 'info' : 'secondary'" /></td>
-                            <td><p-tag [value]="user.active ? 'Ativa' : 'Desativada'" [severity]="user.active ? 'success' : 'danger'" /></td>
-                            <td class="whitespace-nowrap">{{ user.lastLoginAt ? (user.lastLoginAt | date: 'short') : 'Nunca' }}</td>
-                            <td class="text-right whitespace-nowrap">
+                            <td data-label="Papel"><p-tag [value]="user.role === 'ADMIN' ? 'Administrador' : 'Usuário'" [severity]="user.role === 'ADMIN' ? 'info' : 'secondary'" /></td>
+                            <td data-label="Situação"><p-tag [value]="user.active ? 'Ativa' : 'Desativada'" [severity]="user.active ? 'success' : 'danger'" /></td>
+                            <td class="whitespace-nowrap" data-label="Último acesso">{{ user.lastLoginAt ? (user.lastLoginAt | date: 'short') : 'Nunca' }}</td>
+                            <td class="stack-actions text-right whitespace-nowrap">
                                 <p-button label="Editar" size="small" severity="secondary" [text]="true" [ariaLabel]="'Editar ' + user.name" (onClick)="openEdit(user)" />
                                 <p-button label="Senha" size="small" severity="secondary" [text]="true" [ariaLabel]="'Definir nova senha de ' + user.name" (onClick)="openPassword(user)" />
                                 <p-button label="Encerrar sessões" size="small" severity="secondary" [text]="true" [ariaLabel]="'Encerrar sessões de ' + user.name" (onClick)="endSessions(user)" />

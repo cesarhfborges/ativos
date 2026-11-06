@@ -111,8 +111,8 @@ type LoadedItems = SyncItem[] | 'loading' | 'failed';
                 @if (failure(); as message) {
                     <p-message severity="error" [text]="message" styleClass="mb-4" />
                 }
-                <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Registros de sincronização">
-                    <p-table class="block min-w-[56rem]" dataKey="id" [value]="runs()" [lazy]="true" [paginator]="true" [rows]="pageSize" [first]="first()" [totalRecords]="total()" [loading]="loading()" (onLazyLoad)="onPage($event)" (onRowExpand)="onExpand($event)">
+                <div class="stack-table stack-56">
+                    <p-table dataKey="id" [value]="runs()" [lazy]="true" [paginator]="true" [rows]="pageSize" [first]="first()" [totalRecords]="total()" [loading]="loading()" (onLazyLoad)="onPage($event)" (onRowExpand)="onExpand($event)">
                         <ng-template #header>
                             <tr>
                                 <th scope="col" class="w-12"><span class="sr-only">Detalhes</span></th>
@@ -126,17 +126,17 @@ type LoadedItems = SyncItem[] | 'loading' | 'failed';
                         </ng-template>
                         <ng-template #body let-run let-expanded="expanded">
                             <tr>
-                                <td>
+                                <td class="stack-toggle">
                                     <button type="button" pButton [pRowToggler]="run" [text]="true" [rounded]="true" severity="secondary" [attr.aria-label]="(expanded ? 'Ocultar' : 'Mostrar') + ' símbolos da execução de ' + (run.startedAt | date: 'short')" [attr.aria-expanded]="expanded">
                                         <i class="pi" [class.pi-chevron-down]="expanded" [class.pi-chevron-right]="!expanded" pButtonIcon aria-hidden="true"></i>
                                     </button>
                                 </td>
-                                <td class="whitespace-nowrap">{{ run.startedAt | date: 'short' }}</td>
-                                <td class="whitespace-nowrap">{{ originLabel(run.origin) }}</td>
-                                <td><p-tag [value]="runStatus(run.status).label" [severity]="runStatus(run.status).severity" /></td>
-                                <td class="whitespace-nowrap tabular-nums">{{ run.updatedSymbols }} de {{ run.requestedSymbols }}</td>
-                                <td class="whitespace-nowrap tabular-nums">{{ duration(run) }}</td>
-                                <td class="wrap-anywhere">{{ run.message ?? '—' }}</td>
+                                <td class="stack-full whitespace-nowrap" data-label="Quando">{{ run.startedAt | date: 'short' }}</td>
+                                <td class="whitespace-nowrap" data-label="Origem">{{ originLabel(run.origin) }}</td>
+                                <td data-label="Situação"><p-tag [value]="runStatus(run.status).label" [severity]="runStatus(run.status).severity" /></td>
+                                <td class="whitespace-nowrap tabular-nums" data-label="Atualizados">{{ run.updatedSymbols }} de {{ run.requestedSymbols }}</td>
+                                <td class="whitespace-nowrap tabular-nums" data-label="Duração">{{ duration(run) }}</td>
+                                <td class="stack-full wrap-anywhere" data-label="Mensagem">{{ run.message ?? '—' }}</td>
                             </tr>
                         </ng-template>
                         <ng-template #expandedrow let-run>
@@ -163,10 +163,10 @@ type LoadedItems = SyncItem[] | 'loading' | 'failed';
                                             <tbody>
                                                 @for (item of loaded; track item.symbol + item.kind) {
                                                     <tr>
-                                                        <td class="p-2 font-medium">{{ item.symbol }}</td>
-                                                        <td class="p-2">{{ item.kind === 'QUOTE' ? 'Cotação' : 'Histórico' }}</td>
-                                                        <td class="p-2"><p-tag [value]="itemStatus(item.status).label" [severity]="itemStatus(item.status).severity" /></td>
-                                                        <td class="p-2 wrap-anywhere">{{ item.message ?? (item.points !== null ? item.points + ' fechamentos diários' : '—') }}</td>
+                                                        <td class="p-2 font-medium" data-label="Símbolo">{{ item.symbol }}</td>
+                                                        <td class="p-2" data-label="Busca">{{ item.kind === 'QUOTE' ? 'Cotação' : 'Histórico' }}</td>
+                                                        <td class="p-2" data-label="Resultado"><p-tag [value]="itemStatus(item.status).label" [severity]="itemStatus(item.status).severity" /></td>
+                                                        <td class="stack-full p-2 wrap-anywhere" data-label="Detalhes">{{ item.message ?? (item.points !== null ? item.points + ' fechamentos diários' : '—') }}</td>
                                                     </tr>
                                                 }
                                             </tbody>

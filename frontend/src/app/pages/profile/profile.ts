@@ -30,7 +30,7 @@ import { ProfileFields } from './profile-fields';
                 <p-button label="Tentar novamente" icon="pi pi-refresh" (onClick)="load()" />
             </div>
         } @else if (profile(); as data) {
-            <div class="grid grid-cols-12 gap-8">
+            <div class="grid grid-cols-12 gap-4 sm:gap-8">
                 <section class="col-span-12 xl:col-span-7" aria-labelledby="profile-data-title">
                     <div class="card mb-0! h-full">
                         <h2 id="profile-data-title" class="text-xl! font-semibold mt-0! mb-6!">Dados pessoais</h2>

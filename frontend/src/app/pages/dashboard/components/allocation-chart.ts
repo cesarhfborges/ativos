@@ -1,6 +1,7 @@
 import { CurrencyPipe, DecimalPipe, formatCurrency } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { ChartModule } from 'primeng/chart';
+import { ChartResize } from '@/app/shared/chart-resize';
 import { AllocationKey, AllocationSlice } from '@/app/core/portfolio';
 import { LayoutService } from '@/app/layout/service/layout.service';
 
@@ -12,7 +13,7 @@ const COLORS: Record<'light' | 'dark', Record<AllocationKey, string>> = {
 
 @Component({
     selector: 'app-allocation-chart',
-    imports: [ChartModule, CurrencyPipe, DecimalPipe],
+    imports: [ChartModule, ChartResize, CurrencyPipe, DecimalPipe],
     template: `<div class="card mb-0! h-full">
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Alocação da carteira</h2>
         <p class="text-muted-color mt-0! mb-6!">Criptomoedas e ações, a valor de mercado.</p>
@@ -20,7 +21,7 @@ const COLORS: Record<'light' | 'dark', Record<AllocationKey, string>> = {
         <div class="flex flex-col items-center gap-6">
             @if (hasData()) {
                 <div class="w-44 max-w-full shrink-0">
-                    <p-chart type="doughnut" [data]="chartData()" [options]="chartOptions" [ariaLabel]="description()" />
+                    <p-chart appChartResize type="doughnut" [data]="chartData()" [options]="chartOptions" [ariaLabel]="description()" />
                 </div>
             } @else {
                 <p class="text-muted-color m-0! w-full">Sua carteira ainda está vazia. Registre uma compra para ver a distribuição.</p>
@@ -40,9 +41,9 @@ const COLORS: Record<'light' | 'dark', Record<AllocationKey, string>> = {
                 <tbody>
                     @for (slice of slices(); track slice.key) {
                         <tr>
-                            <th scope="row" class="py-2 font-normal text-left"><span class="inline-block w-3 h-3 rounded-sm mr-2" [style.background-color]="palette()[slice.key]"></span>{{ slice.label }}</th>
+                            <th scope="row" class="py-2 font-normal text-left"><span class="inline-block w-3 h-3 rounded-sm mr-1" [style.background-color]="palette()[slice.key]"></span>{{ slice.label }}</th>
                             <td class="py-2 text-right">{{ slice.value | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
-                            <td class="py-2 pl-4 text-right font-medium w-20">{{ slice.percent | number: '1.1-1' }}%</td>
+                            <td class="py-2 pl-2 text-right font-medium">{{ slice.percent | number: '1.1-1' }}%</td>
                         </tr>
                     }
                 </tbody>

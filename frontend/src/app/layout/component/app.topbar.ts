@@ -16,7 +16,7 @@ import { SyncIndicator } from '@/app/shared/sync-indicator';
             <button type="button" class="layout-menu-button layout-topbar-action" aria-label="Alternar menu de navegação" [attr.aria-expanded]="layoutService.isMenuVisible()" (click)="layoutService.toggleMenu()">
                 <i class="pi pi-bars" aria-hidden="true"></i>
             </button>
-            <a class="layout-topbar-logo" routerLink="/">
+            <a class="layout-topbar-logo" routerLink="/" aria-label="Ativos">
                 <i class="pi pi-chart-line text-primary text-2xl!" aria-hidden="true"></i>
                 <span class="hidden sm:inline">Ativos</span>
             </a>

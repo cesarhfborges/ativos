@@ -9,7 +9,7 @@ import { ProfitLoss } from '@/app/shared/profit-loss';
 @Component({
     selector: 'app-market-highlights',
     imports: [DecimalPipe, PercentChange, ProfitLoss],
-    host: { class: 'grid grid-cols-12 gap-8' },
+    host: { class: 'grid grid-cols-12 gap-4 sm:gap-8' },
     template: `
         <div class="col-span-12 md:col-span-6 2xl:col-span-3">
             <div class="card mb-0! h-full">

@@ -1,6 +1,7 @@
 import { formatCurrency, formatDate } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { ChartModule } from 'primeng/chart';
+import { ChartResize } from '@/app/shared/chart-resize';
 import { Scenario, SimulationResponse } from '@/app/core/api.models';
 import { LayoutService } from '@/app/layout/service/layout.service';
 
@@ -23,9 +24,9 @@ const toX = (date: string) => new Date(`${date}T12:00:00Z`).getTime();
 /** A linha do cenário escolhido fica em destaque, com sua faixa provável; as outras servem de referência. */
 @Component({
     selector: 'app-projection-chart',
-    imports: [ChartModule],
+    imports: [ChartModule, ChartResize],
     template: `<div class="h-80 lg:h-96">
-        <p-chart type="line" height="100%" [data]="data()" [options]="options()" [ariaLabel]="description()" />
+        <p-chart appChartResize type="line" height="100%" [data]="data()" [options]="options()" [ariaLabel]="description()" />
     </div>`
 })
 export class ProjectionChart {

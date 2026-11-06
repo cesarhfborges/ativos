@@ -1,6 +1,7 @@
 import { CurrencyPipe, DatePipe, formatCurrency, formatDate } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { ChartModule } from 'primeng/chart';
+import { ChartResize } from '@/app/shared/chart-resize';
 import { PortfolioHistoryPoint } from '@/app/core/api.models';
 import { chartTheme } from '@/app/core/chart-theme';
 import { axisDateFormat } from '@/app/core/market';
@@ -12,7 +13,7 @@ const brl = (value: number) => formatCurrency(value, 'pt-BR', 'R$', 'BRL', '1.2-
 
 @Component({
     selector: 'app-history-chart',
-    imports: [ChartModule, CurrencyPipe, DatePipe],
+    imports: [ChartModule, ChartResize, CurrencyPipe, DatePipe],
     template: `<div class="card mb-0! h-full">
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Evolução patrimonial</h2>
         <p class="text-muted-color mt-0! mb-6!">Quanto a carteira vale e quanto custou. O espaço entre as linhas é o lucro ou prejuízo.</p>
@@ -21,7 +22,7 @@ const brl = (value: number) => formatCurrency(value, 'pt-BR', 'R$', 'BRL', '1.2-
             <p class="text-muted-color m-0!">Ainda não há histórico neste período. Um novo ponto é registrado a cada hora cheia, quando as cotações são coletadas.</p>
         } @else {
             <div class="h-72">
-                <p-chart type="line" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="description()" />
+                <p-chart appChartResize type="line" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="description()" />
             </div>
             <details class="mt-4">
                 <summary class="cursor-pointer text-muted-color">Ver os dados mais recentes em tabela</summary>

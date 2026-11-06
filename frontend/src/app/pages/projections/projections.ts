@@ -110,8 +110,8 @@ const SCENARIO_ICONS: Record<Scenario, string> = { PESSIMISTIC: 'pi pi-arrow-dow
 
                         <details class="mt-4">
                             <summary class="cursor-pointer text-muted-color">Ver mês a mês</summary>
-                            <div class="overflow-x-auto mt-2" tabindex="0" role="region" aria-label="Projeção mês a mês">
-                                <table class="w-full min-w-md">
+                            <div class="stack-table stack-28 mt-2">
+                                <table class="w-full">
                                     <thead>
                                         <tr>
                                             <th scope="col" class="py-1 text-left">Mês</th>
@@ -123,10 +123,10 @@ const SCENARIO_ICONS: Record<Scenario, string> = { PESSIMISTIC: 'pi pi-arrow-dow
                                     <tbody>
                                         @for (point of data.projection; track point.date) {
                                             <tr>
-                                                <td class="py-1">{{ monthLabel(point.date) }}</td>
-                                                <td class="py-1 text-right">{{ point.lower | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
-                                                <td class="py-1 text-right font-medium">{{ point.expected | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
-                                                <td class="py-1 text-right">{{ point.upper | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
+                                                <td class="py-1 stack-full font-medium">{{ monthLabel(point.date) }}</td>
+                                                <td class="py-1 text-right" data-label="Limite inferior">{{ point.lower | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
+                                                <td class="py-1 text-right font-medium" data-label="Esperado">{{ point.expected | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
+                                                <td class="py-1 text-right" data-label="Limite superior">{{ point.upper | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -135,7 +135,7 @@ const SCENARIO_ICONS: Record<Scenario, string> = { PESSIMISTIC: 'pi pi-arrow-dow
                         </details>
                     </section>
 
-                    <div class="grid grid-cols-12 gap-8">
+                    <div class="grid grid-cols-12 gap-4 sm:gap-8">
                         <section class="col-span-12 lg:col-span-7 card mb-0!" aria-labelledby="projection-risk-title">
                             <h2 id="projection-risk-title" class="text-xl! font-semibold mt-0! mb-4!">Riscos da carteira</h2>
                             <ul class="list-none m-0 p-0 flex flex-col gap-4">

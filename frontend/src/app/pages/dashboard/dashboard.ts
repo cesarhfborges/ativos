@@ -77,7 +77,7 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
                 <p-button label="Tentar novamente" icon="pi pi-refresh" [loading]="loading()" (onClick)="load()" />
             </div>
         } @else if (overview(); as data) {
-            <div class="grid grid-cols-12 gap-8">
+            <div class="grid grid-cols-12 gap-4 sm:gap-8">
                 <div class="col-span-12 md:col-span-6 2xl:col-span-3">
                     <app-stat-card label="Patrimônio total" icon="pi pi-wallet" hint="Posições a valor de mercado" [value]="data.marketValue" />
                 </div>
@@ -143,7 +143,7 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
                     </div>
                 }
 
-                <div class="col-span-12 grid grid-cols-12 gap-8 transition-opacity" [class.opacity-60]="periodLoading()" [attr.aria-busy]="periodLoading()">
+                <div class="col-span-12 grid grid-cols-12 gap-4 sm:gap-8 transition-opacity" [class.opacity-60]="periodLoading()" [attr.aria-busy]="periodLoading()">
                     <section class="col-span-12" aria-labelledby="positions-title">
                         <div class="card mb-0!">
                             <h2 id="positions-title" class="text-xl! font-semibold mt-0! mb-6!">Posições atuais</h2>
@@ -184,7 +184,7 @@ const decimal = (value: number, digits: number) => Math.abs(value).toLocaleStrin
                 </section>
             </div>
         } @else {
-            <div class="grid grid-cols-12 gap-8" aria-busy="true" aria-label="Carregando a carteira">
+            <div class="grid grid-cols-12 gap-4 sm:gap-8" aria-busy="true" aria-label="Carregando a carteira">
                 @for (card of [1, 2, 3]; track card) {
                     <div class="col-span-12 md:col-span-6 xl:col-span-4"><p-skeleton height="9rem" /></div>
                 }

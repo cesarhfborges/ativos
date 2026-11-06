@@ -1,6 +1,7 @@
 import { DecimalPipe, formatDate } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { ChartModule } from 'primeng/chart';
+import { ChartResize } from '@/app/shared/chart-resize';
 import { PortfolioHistoryPoint } from '@/app/core/api.models';
 import { chartTheme } from '@/app/core/chart-theme';
 import { axisDateFormat, returnSeries } from '@/app/core/market';
@@ -13,7 +14,7 @@ const percent = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}$
 /** Separa o que é valorização do que é aporte: comprar mais aumenta o patrimônio, não o retorno. */
 @Component({
     selector: 'app-return-chart',
-    imports: [ChartModule, DecimalPipe],
+    imports: [ChartModule, ChartResize, DecimalPipe],
     template: `<div class="card mb-0! h-full">
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Retorno da carteira</h2>
         <p class="text-muted-color mt-0! mb-6!">Lucro ou prejuízo sobre o investido, sem o efeito das compras.</p>
@@ -22,7 +23,7 @@ const percent = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}$
             <p class="text-muted-color m-0!">São necessários ao menos dois registros no período. Um novo é feito a cada hora cheia.</p>
         } @else {
             <div class="h-72">
-                <p-chart type="line" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="ariaDescription()" />
+                <p-chart appChartResize type="line" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="ariaDescription()" />
             </div>
             <details class="mt-4">
                 <summary class="cursor-pointer text-muted-color">Ver os dados mais recentes em tabela</summary>

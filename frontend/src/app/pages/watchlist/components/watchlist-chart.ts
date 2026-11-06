@@ -1,6 +1,7 @@
 import { CurrencyPipe, formatCurrency, formatDate } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { ChartModule } from 'primeng/chart';
+import { ChartResize } from '@/app/shared/chart-resize';
 import { WatchlistItem } from '@/app/core/api.models';
 import { chartTheme } from '@/app/core/chart-theme';
 import { PlanKind, planTargets } from '@/app/core/watchlist';
@@ -19,12 +20,12 @@ const money = (value: number) => formatCurrency(value, 'pt-BR', 'R$', 'BRL', '1.
 /** O preço no período e as linhas dos alvos, para ver a distância até eles ao longo do tempo. */
 @Component({
     selector: 'app-watchlist-chart',
-    imports: [ChartModule, CurrencyPipe],
+    imports: [ChartModule, ChartResize, CurrencyPipe],
     template: `@if (item().prices.length < 2) {
             <p class="text-surface-600 dark:text-surface-300 m-0!">Ainda não há preços suficientes neste período. O histórico é buscado logo depois de adicionar o ativo.</p>
         } @else {
             <div class="h-72">
-                <p-chart type="line" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="description()" />
+                <p-chart appChartResize type="line" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="description()" />
             </div>
             <dl class="grid grid-cols-2 gap-4 mt-4 mb-0">
                 <div>

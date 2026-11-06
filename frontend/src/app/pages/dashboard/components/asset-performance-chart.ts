@@ -1,6 +1,7 @@
 import { DecimalPipe, formatDate } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { ChartModule } from 'primeng/chart';
+import { ChartResize } from '@/app/shared/chart-resize';
 import { DashboardPosition, MarketAsset } from '@/app/core/api.models';
 import { chartTheme, MAX_LINE_SERIES } from '@/app/core/chart-theme';
 import { alignIndexed } from '@/app/core/market';
@@ -16,7 +17,7 @@ const decimal = (value: number) => value.toLocaleString('pt-BR', { minimumFracti
 /** Preços muito diferentes só são comparáveis na mesma escala: todos partem de 100 no início do período. */
 @Component({
     selector: 'app-asset-performance-chart',
-    imports: [ChartModule, DecimalPipe, PercentChange],
+    imports: [ChartModule, ChartResize, DecimalPipe, PercentChange],
     template: `<div class="card mb-0! h-full">
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Desempenho dos ativos</h2>
         <p class="text-muted-color mt-0! mb-6!">{{ subtitle() }}</p>
@@ -25,7 +26,7 @@ const decimal = (value: number) => value.toLocaleString('pt-BR', { minimumFracti
             <p class="text-muted-color m-0!">Ainda não há preços suficientes neste período. O histórico é buscado na próxima coleta de cotações.</p>
         } @else {
             <div class="h-80">
-                <p-chart type="line" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="ariaDescription()" />
+                <p-chart appChartResize type="line" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="ariaDescription()" />
             </div>
             <details class="mt-4">
                 <summary class="cursor-pointer text-muted-color">Ver os dados em tabela</summary>

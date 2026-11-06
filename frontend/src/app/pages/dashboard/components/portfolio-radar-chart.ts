@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { ChartModule } from 'primeng/chart';
+import { ChartResize } from '@/app/shared/chart-resize';
 import { chartTheme } from '@/app/core/chart-theme';
 import { RadarAxis } from '@/app/core/portfolio-radar';
 import { LayoutService } from '@/app/layout/service/layout.service';
@@ -12,7 +13,7 @@ const FILL_ALPHA = '33';
 /** O formato da carteira em seis notas. A tabela traz o valor real por trás de cada uma e explica como é medida. */
 @Component({
     selector: 'app-portfolio-radar-chart',
-    imports: [ChartModule, DecimalPipe],
+    imports: [ChartModule, ChartResize, DecimalPipe],
     template: `<div class="card mb-0! h-full">
         <h2 class="text-xl! font-semibold mt-0! mb-1!">Perfil da carteira</h2>
         <p class="text-muted-color mt-0! mb-6!">Notas de 0 a 100 para comparar aspectos da carteira. Descrevem como ela está hoje e não são recomendação de investimento.</p>
@@ -20,13 +21,13 @@ const FILL_ALPHA = '33';
         <div class="flex flex-col lg:flex-row lg:items-center gap-8">
             @if (plotted().length >= minAxes) {
                 <div class="h-96 w-full lg:w-[28rem] shrink-0">
-                    <p-chart type="radar" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="description()" />
+                    <p-chart appChartResize type="radar" height="100%" [data]="chartData()" [options]="chartOptions()" [ariaLabel]="description()" />
                 </div>
             } @else {
                 <p class="text-muted-color m-0! lg:w-[28rem] shrink-0">Ainda não há dados suficientes para desenhar o perfil. Ele aparece quando a carteira tiver posições com cotação.</p>
             }
 
-            <div class="grow min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="Notas do perfil da carteira">
+            <div class="stack-table stack-28 grow min-w-0 w-full">
                 <table class="w-full">
                     <caption class="sr-only">Notas do perfil da carteira e o que cada uma mede</caption>
                     <thead>
@@ -39,12 +40,12 @@ const FILL_ALPHA = '33';
                     <tbody>
                         @for (axis of axes(); track axis.key) {
                             <tr>
-                                <th scope="row" class="py-2 text-left font-medium align-top">
+                                <th scope="row" class="stack-full py-2 text-left font-medium align-top">
                                     {{ axis.label }}
                                     <div class="text-muted-color text-sm font-normal">{{ axis.hint }}</div>
                                 </th>
-                                <td class="py-2 pl-4 text-right tabular-nums font-medium align-top">{{ axis.score === null ? '—' : (axis.score | number: '1.0-0') }}</td>
-                                <td class="py-2 pl-4 align-top">{{ axis.detail }}</td>
+                                <td class="py-2 pl-4 text-right tabular-nums font-medium align-top" data-label="Nota">{{ axis.score === null ? '—' : (axis.score | number: '1.0-0') }}</td>
+                                <td class="py-2 pl-4 align-top" data-label="Hoje">{{ axis.detail }}</td>
                             </tr>
                         }
                     </tbody>

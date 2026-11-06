@@ -30,8 +30,8 @@ const FILTER_DELAY_MS = 300;
                 <p-message severity="error" [text]="message" styleClass="mb-4" />
                 <p-button label="Tentar novamente" icon="pi pi-refresh" [loading]="loading()" (onClick)="load(currentPage())" />
             } @else {
-                <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Lançamentos do extrato">
-                    <p-table class="block min-w-[60rem]" [value]="result()?.data ?? []" dataKey="id" [loading]="loading()">
+                <div class="stack-table stack-66">
+                    <p-table [value]="result()?.data ?? []" dataKey="id" [loading]="loading()">
                         <ng-template #header>
                             <tr>
                                 <th scope="col">Data</th>
@@ -47,25 +47,25 @@ const FILTER_DELAY_MS = 300;
                         </ng-template>
                         <ng-template #body let-transaction>
                             <tr [class.text-muted-color]="transaction.reversedAt">
-                                <td class="whitespace-nowrap">{{ transaction.timestamp | date: 'short' }}</td>
-                                <td class="whitespace-nowrap"><i class="mr-2 {{ display(transaction.type).icon }}" aria-hidden="true"></i>{{ display(transaction.type).label }}</td>
-                                <td>{{ transaction.symbol }}</td>
-                                <td class="text-right">
+                                <td class="whitespace-nowrap" data-label="Data">{{ transaction.timestamp | date: 'short' }}</td>
+                                <td class="whitespace-nowrap" data-label="Operação"><i class="mr-2 {{ display(transaction.type).icon }}" aria-hidden="true"></i>{{ display(transaction.type).label }}</td>
+                                <td data-label="Ativo">{{ transaction.symbol }}</td>
+                                <td class="text-right" data-label="Quantidade">
                                     {{ transaction.quantity | number: '1.0-8' }}
                                 </td>
-                                <td class="text-right">
+                                <td class="text-right" data-label="Preço unitário">
                                     {{ transaction.unitPrice | currency: 'BRL' : 'symbol' : '1.2-8' }}
                                 </td>
-                                <td class="text-right">{{ transaction.fee | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
-                                <td class="text-right font-medium whitespace-nowrap" [class.line-through]="transaction.reversedAt">{{ transaction.totalAmount | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
-                                <td class="text-right whitespace-nowrap">
+                                <td class="text-right" data-label="Taxa">{{ transaction.fee | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
+                                <td class="text-right font-medium whitespace-nowrap" data-label="Total" [class.line-through]="transaction.reversedAt">{{ transaction.totalAmount | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
+                                <td class="text-right whitespace-nowrap" data-label="Lucro realizado">
                                     @if (transaction.realizedProfit !== null) {
                                         <app-profit-loss [class.line-through]="transaction.reversedAt" [value]="transaction.realizedProfit" />
                                     } @else {
                                         —
                                     }
                                 </td>
-                                <td class="text-right whitespace-nowrap">
+                                <td class="text-right whitespace-nowrap" data-label="Situação">
                                     @if (transaction.reversedAt) {
                                         <div class="font-medium"><i class="pi pi-undo mr-1" aria-hidden="true"></i>Estornada</div>
                                         <div class="text-muted-color text-sm">{{ transaction.reversedAt | date: 'short' }}</div>

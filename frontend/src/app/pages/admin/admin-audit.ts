@@ -38,8 +38,8 @@ const ACTION_LABELS: Record<string, string> = {
             @if (failure(); as message) {
                 <p-message severity="error" [text]="message" styleClass="mb-4" />
             }
-            <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Registro de auditoria">
-                <p-table class="block min-w-[56rem]" dataKey="id" [value]="entries()" [lazy]="true" [paginator]="true" [rows]="pageSize" [totalRecords]="total()" [loading]="loading()" (onLazyLoad)="onPage($event)">
+            <div class="stack-table stack-40">
+                <p-table dataKey="id" [value]="entries()" [lazy]="true" [paginator]="true" [rows]="pageSize" [totalRecords]="total()" [loading]="loading()" (onLazyLoad)="onPage($event)">
                     <ng-template #header>
                         <tr>
                             <th scope="col">Quando</th>
@@ -51,11 +51,11 @@ const ACTION_LABELS: Record<string, string> = {
                     </ng-template>
                     <ng-template #body let-entry>
                         <tr>
-                            <td class="whitespace-nowrap">{{ entry.createdAt | date: 'short' }}</td>
-                            <td>{{ entry.actorEmail }}</td>
-                            <td class="whitespace-nowrap">{{ actionLabel(entry.action) }}</td>
-                            <td>{{ entry.target ?? '—' }}</td>
-                            <td>{{ entry.details ?? '—' }}</td>
+                            <td class="whitespace-nowrap" data-label="Quando">{{ entry.createdAt | date: 'short' }}</td>
+                            <td data-label="Quem">{{ entry.actorEmail }}</td>
+                            <td class="whitespace-nowrap" data-label="Ação">{{ actionLabel(entry.action) }}</td>
+                            <td data-label="Alvo">{{ entry.target ?? '—' }}</td>
+                            <td class="stack-full" data-label="Detalhes">{{ entry.details ?? '—' }}</td>
                         </tr>
                     </ng-template>
                     <ng-template #emptymessage>

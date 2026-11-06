@@ -38,8 +38,8 @@ const VERIFICATION_RESULT: Record<AssetVerification['check'], { severity: 'succe
             @if (failure(); as message) {
                 <p-message severity="error" [text]="message" styleClass="mb-4" />
             }
-            <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Catálogo de ativos">
-                <p-table class="block min-w-[56rem]" dataKey="id" [value]="assets()" [lazy]="true" [paginator]="true" [rows]="pageSize" [totalRecords]="total()" [loading]="loading()" (onLazyLoad)="onPage($event)">
+            <div class="stack-table stack-52">
+                <p-table dataKey="id" [value]="assets()" [lazy]="true" [paginator]="true" [rows]="pageSize" [totalRecords]="total()" [loading]="loading()" (onLazyLoad)="onPage($event)">
                     <ng-template #header>
                         <tr>
                             <th scope="col">Ativo</th>
@@ -52,15 +52,15 @@ const VERIFICATION_RESULT: Record<AssetVerification['check'], { severity: 'succe
                     </ng-template>
                     <ng-template #body let-asset>
                         <tr>
-                            <td>
+                            <td class="stack-full">
                                 <div class="font-medium">{{ asset.symbol }}</div>
                                 <div class="text-muted-color text-sm">{{ asset.name }}</div>
                             </td>
-                            <td>{{ asset.assetType === 'CRYPTO' ? 'Cripto' : 'Ação' }}</td>
-                            <td><p-tag [value]="asset.verificationStatus === 'VERIFIED' ? 'Verificado' : 'Não verificado'" [severity]="asset.verificationStatus === 'VERIFIED' ? 'success' : 'warn'" /></td>
-                            <td class="text-right tabular-nums">{{ asset.openPositions | number }}</td>
-                            <td class="text-right tabular-nums">{{ asset.transactions | number }}</td>
-                            <td class="text-right whitespace-nowrap">
+                            <td data-label="Tipo">{{ asset.assetType === 'CRYPTO' ? 'Cripto' : 'Ação' }}</td>
+                            <td data-label="Verificação"><p-tag [value]="asset.verificationStatus === 'VERIFIED' ? 'Verificado' : 'Não verificado'" [severity]="asset.verificationStatus === 'VERIFIED' ? 'success' : 'warn'" /></td>
+                            <td class="text-right tabular-nums" data-label="Posições abertas">{{ asset.openPositions | number }}</td>
+                            <td class="text-right tabular-nums" data-label="Operações">{{ asset.transactions | number }}</td>
+                            <td class="stack-actions text-right whitespace-nowrap">
                                 <p-button label="Editar" size="small" severity="secondary" [text]="true" [ariaLabel]="'Editar ' + asset.symbol" (onClick)="edit(asset)" />
                                 <p-button label="Verificar" size="small" severity="secondary" [text]="true" [ariaLabel]="'Verificar ' + asset.symbol + ' no provedor'" (onClick)="verify(asset)" />
                                 @if (asset.transactions === 0) {

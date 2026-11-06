@@ -177,6 +177,8 @@ npm test -- --watch=false --browsers=ChromeHeadless
 
 No `docker compose -f docker-compose.dev.yml up --build`, a aplicação sobe em <http://localhost:4200>: o Nginx encaminha `/api/` ao backend e o restante ao container do frontend. O código fica em `frontend/src/app`: `core` (API, sessão e cálculos), `layout` (estrutura da página) e `pages` (telas).
 
+As tabelas não têm rolagem horizontal: quando falta espaço, cada linha vira um bloco com um campo por linha, e o cabeçalho dá lugar a um seletor "Ordenar por". Para usar em uma tabela nova, veja `src/assets/layout/_stack-table.scss`. O `responsiveLayout="stack"` do PrimeNG está depreciado desde a v20. Os gráficos usam a diretiva `appChartResize`, que os ajusta quando a janela ou o contêiner mudam.
+
 Telas: login, registro, painel para acompanhamento (patrimônio, desempenho, alvos atingidos, perfil da carteira, posições a mercado, evolução patrimonial, alocação e últimas operações), carteira para registrar compras e vendas, acompanhamento de ativos com ou sem posição, extrato com filtro por tipo e lucro realizado, projeções e, para administradores, visão geral, usuários, ativos, configurações e auditoria. O sistema não controla saldo em caixa: registra as compras e vendas feitas pelo usuário.
 
 ## Documentação da API
